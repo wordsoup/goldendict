@@ -23,7 +23,6 @@
 #include "utf8.hh"
 #include "filetype.hh"
 #include "ftshelpers.hh"
-#include "btreeidx.hh"
 
 namespace Epwing {
 
@@ -120,15 +119,17 @@ public:
   virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                       vector< wstring > const & alts,
                                                       wstring const & )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual sptr< Dictionary::DataRequest > getResource( string const & name )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual sptr< Dictionary::DataRequest > getSearchResults( QString const & searchString,
                                                             int searchMode, bool matchCase,
                                                             int distanceBetweenWords,
-                                                            int maxResults );
+                                                            int maxResults,
+                                                            bool ignoreWordsOrder,
+                                                            bool ignoreDiacritics );
   virtual void getArticleText( uint32_t articleAddress, QString & headword, QString & text );
 
   virtual void makeFTSIndex(QAtomicInt & isCancelled, bool firstIteration );
@@ -151,13 +152,13 @@ public:
 
   virtual sptr< Dictionary::WordSearchRequest > prefixMatch( wstring const &,
                                                              unsigned long )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual sptr< Dictionary::WordSearchRequest > stemmedMatch( wstring const &,
                                                               unsigned minLength,
                                                               unsigned maxSuffixVariation,
                                                               unsigned long maxResults )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
 protected:
 
@@ -610,7 +611,7 @@ void EpwingArticleRequest::run()
     return;
   }
 
-  string result = "<span class=\"epwing_article\">";
+  string result = "<div class=\"epwing_article\">";
 
   multimap< wstring, pair< string, string > >::const_iterator i;
 
@@ -630,7 +631,7 @@ void EpwingArticleRequest::run()
       result += i->second.second;
   }
 
-  result += "</span>";
+  result += "</div>";
 
   Mutex::Lock _( dataMutex );
 
@@ -646,7 +647,7 @@ void EpwingArticleRequest::run()
 sptr< Dictionary::DataRequest > EpwingDictionary::getArticle( wstring const & word,
                                                               vector< wstring > const & alts,
                                                               wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new EpwingArticleRequest( word, alts, *this );
 }
@@ -774,7 +775,7 @@ void EpwingResourceRequest::run()
 }
 
 sptr< Dictionary::DataRequest > EpwingDictionary::getResource( string const & name )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new EpwingResourceRequest( *this, name );
 }
@@ -783,9 +784,11 @@ sptr< Dictionary::DataRequest > EpwingDictionary::getResource( string const & na
 sptr< Dictionary::DataRequest > EpwingDictionary::getSearchResults( QString const & searchString,
                                                                     int searchMode, bool matchCase,
                                                                     int distanceBetweenWords,
-                                                                    int maxResults )
+                                                                    int maxResults,
+                                                                    bool ignoreWordsOrder,
+                                                                    bool ignoreDiacritics )
 {
-  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults );
+  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults, ignoreWordsOrder, ignoreDiacritics );
 }
 
 int EpwingDictionary::japaneseWriting( gd::wchar ch )
@@ -919,7 +922,7 @@ void EpwingWordSearchRequest::findMatches()
 
 sptr< Dictionary::WordSearchRequest > EpwingDictionary::prefixMatch(
   wstring const & str, unsigned long maxResults )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new EpwingWordSearchRequest( *this, str, 0, -1, true, maxResults );
 }
@@ -927,7 +930,7 @@ sptr< Dictionary::WordSearchRequest > EpwingDictionary::prefixMatch(
 sptr< Dictionary::WordSearchRequest > EpwingDictionary::stemmedMatch(
   wstring const & str, unsigned minLength, unsigned maxSuffixVariation,
   unsigned long maxResults )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new EpwingWordSearchRequest( *this, str, minLength, (int)maxSuffixVariation,
                                       false, maxResults );
@@ -939,7 +942,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                                       vector< string > const & fileNames,
                                       string const & indicesDir,
                                       Dictionary::Initializing & initializing )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 

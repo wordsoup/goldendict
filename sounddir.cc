@@ -94,10 +94,10 @@ public:
   virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                       vector< wstring > const & alts,
                                                       wstring const & )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual sptr< Dictionary::DataRequest > getResource( string const & name )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
 protected:
 
@@ -126,7 +126,7 @@ SoundDirDictionary::SoundDirDictionary( string const & id,
 sptr< Dictionary::DataRequest > SoundDirDictionary::getArticle( wstring const & word,
                                                                 vector< wstring > const & alts,
                                                                 wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< WordArticleLink > chain = findArticles( word );
 
@@ -300,7 +300,7 @@ void SoundDirDictionary::loadIcon() throw()
 }
 
 sptr< Dictionary::DataRequest > SoundDirDictionary::getResource( string const & name )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   bool isNumber = false;
 
@@ -357,7 +357,7 @@ sptr< Dictionary::DataRequest > SoundDirDictionary::getResource( string const & 
 
     return dr;
   }
-  catch( File::Ex )
+  catch( File::Ex & )
   {
     return new Dictionary::DataRequestInstant( false ); // No such resource
   }
@@ -402,7 +402,7 @@ void addDir( QDir const & baseDir, QDir const & dir, IndexedWords & indexedWords
 vector< sptr< Dictionary::Class > > makeDictionaries( Config::SoundDirs const & soundDirs,
                                                       string const & indicesDir,
                                                       Dictionary::Initializing & initializing )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 

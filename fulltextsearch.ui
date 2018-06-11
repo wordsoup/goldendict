@@ -74,6 +74,24 @@
         </item>
        </layout>
       </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_4">
+        <item>
+         <widget class="QCheckBox" name="checkBoxIgnoreWordOrder">
+          <property name="text">
+           <string>Ignore words order</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBoxIgnoreDiacritics">
+          <property name="text">
+           <string>Ignore diacritics</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
      </layout>
     </widget>
    </item>

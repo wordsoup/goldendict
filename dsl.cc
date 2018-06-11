@@ -45,7 +45,12 @@
 #include <QPainter>
 #include <QMap>
 #include <QStringList>
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#else
 #include <QRegExp>
+#endif
 
 // For TIFF conversion
 #include <QImage>
@@ -84,9 +89,9 @@ DEF_EX_STR( exDictzipError, "DICTZIP error", Dictionary::Ex )
 enum
 {
   Signature = 0x584c5344, // DSLX on little-endian, XLSD on big-endian
-  CurrentFormatVersion = 21 + BtreeIndexing::FormatVersion + Folding::Version,
+  CurrentFormatVersion = 22 + BtreeIndexing::FormatVersion + Folding::Version,
   CurrentZipSupportVersion = 2,
-  CurrentFtsIndexVersion = 1
+  CurrentFtsIndexVersion = 5
 };
 
 struct IdxHeader
@@ -108,6 +113,7 @@ struct IdxHeader
   uint32_t langTo;    // Target language
   uint32_t hasZipFile; // Non-zero means there's a zip file with resources
                        // present
+  uint32_t hasSoundDictionaryName;
   uint32_t zipIndexBtreeMaxElements; // Two fields from IndexInfo of the zip
                                      // resource index.
   uint32_t zipIndexRootOffset;
@@ -152,6 +158,7 @@ class DslDictionary: public BtreeIndexing::BtreeDictionary
   IdxHeader idxHeader;
   sptr< ChunkedStorage::Reader > chunks;
   string dictionaryName;
+  string preferredSoundDictionary;
   map< string, string > abrv;
   Mutex dzMutex;
   dictData * dz;
@@ -169,6 +176,8 @@ class DslDictionary: public BtreeIndexing::BtreeDictionary
   int optionalPartNom;
   quint8 articleNom;
   int maxPictureWidth;
+
+  wstring currentHeadword;
 
 public:
 
@@ -200,7 +209,7 @@ public:
 
   #if 0
   virtual vector< wstring > findHeadwordsForSynonym( wstring const & )
-    throw( std::exception )
+    THROW_SPEC( std::exception )
   {
     return vector< wstring >();
   }
@@ -209,15 +218,17 @@ public:
   virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                       vector< wstring > const & alts,
                                                       wstring const & )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual sptr< Dictionary::DataRequest > getResource( string const & name )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual sptr< Dictionary::DataRequest > getSearchResults( QString const & searchString,
                                                             int searchMode, bool matchCase,
                                                             int distanceBetweenWords,
-                                                            int maxResults );
+                                                            int maxResults,
+                                                            bool ignoreWordsOrder,
+                                                            bool ignoreDiacritics );
   virtual QString const& getDescription();
 
   virtual QString getMainFilename();
@@ -300,6 +311,10 @@ DslDictionary::DslDictionary( string const & id,
   vector< char > dName( idx.read< uint32_t >() );
   idx.read( &dName.front(), dName.size() );
   dictionaryName = string( &dName.front(), dName.size() );
+
+  vector< char > sName( idx.read< uint32_t >() );
+  idx.read( &sName.front(), sName.size() );
+  preferredSoundDictionary = string( &sName.front(), sName.size() );
 
   // Everything else would be done in deferred init
 }
@@ -714,7 +729,7 @@ void DslDictionary::loadArticle( uint32_t address,
         wstring str = wstring( articleData, pos, hpos - pos );
 
         hpos = str.find( L'@');
-        if( hpos == wstring::npos || str[ hpos - 1 ] == L'\\' )
+        if( hpos == wstring::npos || str[ hpos - 1 ] == L'\\' || !isAtSignFirst( str ) )
           break;
       }
       else
@@ -742,6 +757,7 @@ string DslDictionary::dslToHtml( wstring const & str, wstring const & headword )
 {
  // Normalize the string
   wstring normalizedStr = gd::normalize( str );
+  currentHeadword = headword;
 
   ArticleDom dom( normalizedStr, getName(), headword );
 
@@ -814,7 +830,7 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
       string id = "O" + getId().substr( 0, 7 ) + "_" +
                 QString::number( articleNom ).toStdString() +
                 "_opt_" + QString::number( optionalPartNom++ ).toStdString();
-    result += "<div class=\"dsl_opt\" id=\"" + id + "\">" + processNodeChildren( node ) + "</div>";
+    result += "<span class=\"dsl_opt\" id=\"" + id + "\">" + processNodeChildren( node ) + "</span>";
   }
   else
   if ( node.tagName == GD_NATIVE_TO_WS( L"m" ) )
@@ -857,6 +873,8 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
       url.setScheme( "gdau" );
       url.setHost( QString::fromUtf8( search ? "search" : getId().c_str() ) );
       url.setPath( Qt4x5::Url::ensureLeadingSlash( QString::fromUtf8( filename.c_str() ) ) );
+      if( search && idxHeader.hasSoundDictionaryName )
+        Qt4x5::Url::setFragment( url, QString::fromUtf8( preferredSoundDictionary.c_str() ) );
 
       string ref = string( "\"" ) + url.toEncoded().data() + "\"";
 
@@ -1022,6 +1040,7 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
         title.reserve( i->second.size() );
 
         for( char const * c = i->second.c_str(); *c; ++c )
+        {
           if ( *c == ' ' || *c == '\t' )
           {
             // u00A0 in utf8
@@ -1029,7 +1048,15 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
             title.push_back( 0xA0 );
           }
           else
+          if( *c == '-' ) // Change minus to non-breaking hyphen (uE28091 in utf8)
+          {
+            title.push_back( 0xE2 );
+            title.push_back( 0x80 );
+            title.push_back( 0x91 );
+          }
+          else
             title.push_back( *c );
+        }
       }
       else
         title = i->second;
@@ -1053,7 +1080,36 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
   else
   if ( node.tagName == GD_NATIVE_TO_WS( L"lang" ) )
   {
-    result += "<span class=\"dsl_lang\">" + processNodeChildren( node ) + "</span>";
+    result += "<span class=\"dsl_lang\"";
+    if( !node.tagAttrs.empty() )
+    {
+      // Find ISO 639-1 code
+      string langcode;
+      QString attr = gd::toQString( node.tagAttrs );
+      int n = attr.indexOf( "id=" );
+      if( n >= 0 )
+      {
+        int id = attr.mid( n + 3 ).toInt();
+        if( id )
+          langcode = findCodeForDslId( id );
+      }
+      else
+      {
+        n = attr.indexOf( "name=\"" );
+        if( n >= 0 )
+        {
+          int n2 = attr.indexOf( '\"', n + 6 );
+          if( n2 > 0 )
+          {
+            quint32 id = dslLanguageToId( gd::toWString( attr.mid( n + 6, n2 - n - 6 ) ) );
+            langcode = LangCoder::intToCode2( id ).toStdString();
+          }
+        }
+      }
+      if( !langcode.empty() )
+        result += " lang=\"" + langcode + "\"";
+    }
+    result += ">" + processNodeChildren( node ) + "</span>";
   }
   else
   if ( node.tagName == GD_NATIVE_TO_WS( L"ref" ) )
@@ -1115,7 +1171,13 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
     result += "<br />";
   }
   else
+  {
+    gdWarning( "DSL: Unknown tag \"%s\" with attributes \"%s\" found in \"%s\", article \"%s\".",
+               gd::toQString( node.tagName ).toUtf8().data(), gd::toQString( node.tagAttrs ).toUtf8().data(),
+               getName().c_str(), gd::toQString( currentHeadword ).toUtf8().data() );
+
     result += "<span class=\"dsl_unknown\">" + processNodeChildren( node ) + "</span>";
+  }
 
   return result;
 }
@@ -1279,7 +1341,7 @@ void DslDictionary::getArticleText( uint32_t articleAddress, QString & headword,
   // Skip headword
 
   size_t pos = 0;
-  wstring articleHeadword;
+  wstring articleHeadword, tildeValue;
 
   // Check if we retrieve insided card
   bool insidedCard = isDslWs( articleData.at( 0 ) );
@@ -1321,12 +1383,13 @@ void DslDictionary::getArticleText( uint32_t articleAddress, QString & headword,
       {
         list< wstring > lst;
 
+        tildeValue = articleHeadword;
+
+        processUnsortedParts( articleHeadword, true );
         expandOptionalParts( articleHeadword, &lst );
 
         if ( lst.size() ) // Should always be
           articleHeadword = lst.front();
-
-        processUnsortedParts( articleHeadword, true );
       }
     }
 
@@ -1362,7 +1425,7 @@ void DslDictionary::getArticleText( uint32_t articleAddress, QString & headword,
         wstring str = wstring( articleData, pos, hpos - pos );
 
         hpos = str.find( L'@');
-        if( hpos == wstring::npos || str[ hpos - 1 ] == L'\\' )
+        if( hpos == wstring::npos || str[ hpos - 1 ] == L'\\' || !isAtSignFirst( str ) )
           break;
       }
       else
@@ -1383,6 +1446,17 @@ void DslDictionary::getArticleText( uint32_t articleAddress, QString & headword,
     articleText = wstring( articleData, pos );
   else
     articleText.clear();
+
+  if( !tildeValue.empty() )
+  {
+    list< wstring > lst;
+
+    processUnsortedParts( tildeValue, false );
+    expandOptionalParts( tildeValue, &lst );
+
+    if ( lst.size() ) // Should always be
+      expandTildes( articleText, lst.front() );
+  }
 
   if( !articleText.empty() )
   {
@@ -1449,7 +1523,11 @@ void DslDictionary::getArticleText( uint32_t articleAddress, QString & headword,
 
     // Strip tags
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    text.remove( QRegularExpression( "\\[[^\\\\\\[\\]]+\\]" ) );
+#else
     text.remove( QRegExp( "\\[[^\\\\\\[\\]]+\\]", Qt::CaseInsensitive ) );
+#endif
 
     // Chech for insided cards
 
@@ -1624,7 +1702,7 @@ void DslArticleRequest::run()
       if( displayedHeadword.empty() || isDslWs( displayedHeadword[ 0 ] ) )
         displayedHeadword = word; // Special case - insided card
 
-      articleText += "<span class=\"dsl_article\">";
+      articleText += "<div class=\"dsl_article\">";
       articleText += "<div class=\"dsl_headwords\"";
       if( dict.isFromLanguageRTL() )
         articleText += " dir=\"rtl\"";
@@ -1648,7 +1726,7 @@ void DslArticleRequest::run()
 
       articleAfter += dict.dslToHtml( articleBody, displayedHeadword );
       articleAfter += "</div>";
-      articleAfter += "</span>";
+      articleAfter += "</div>";
 
       if( dict.hasHiddenZones() )
       {
@@ -1689,7 +1767,7 @@ void DslArticleRequest::run()
 sptr< Dictionary::DataRequest > DslDictionary::getArticle( wstring const & word,
                                                            vector< wstring > const & alts,
                                                            wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new DslArticleRequest( word, alts, *this );
 }
@@ -1868,7 +1946,7 @@ void DslResourceRequest::run()
 }
 
 sptr< Dictionary::DataRequest > DslDictionary::getResource( string const & name )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new DslResourceRequest( *this, name );
 }
@@ -1913,9 +1991,11 @@ static void findCorrespondingFiles( string const & ifo,
 sptr< Dictionary::DataRequest > DslDictionary::getSearchResults( QString const & searchString,
                                                                  int searchMode, bool matchCase,
                                                                  int distanceBetweenWords,
-                                                                 int maxResults )
+                                                                 int maxResults,
+                                                                 bool ignoreWordsOrder,
+                                                                 bool ignoreDiacritics )
 {
-  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults );
+  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults, ignoreWordsOrder, ignoreDiacritics );
 }
 
 } // anonymous namespace
@@ -1927,7 +2007,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                                       string const & indicesDir,
                                       Dictionary::Initializing & initializing,
                                       int maxPictureWidth, unsigned int maxHeadwordSize )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 
@@ -1978,10 +2058,10 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
       string zipFileName;
 
-      if ( File::tryPossibleName( baseName + ".dsl.files.zip", zipFileName ) ||
-           File::tryPossibleName( baseName + ".dsl.dz.files.zip", zipFileName ) ||
-           File::tryPossibleName( baseName + ".DSL.FILES.ZIP", zipFileName ) ||
-           File::tryPossibleName( baseName + ".DSL.DZ.FILES.ZIP", zipFileName ) )
+      if ( File::tryPossibleZipName( baseName + ".dsl.files.zip", zipFileName ) ||
+           File::tryPossibleZipName( baseName + ".dsl.dz.files.zip", zipFileName ) ||
+           File::tryPossibleZipName( baseName + ".DSL.FILES.ZIP", zipFileName ) ||
+           File::tryPossibleZipName( baseName + ".DSL.DZ.FILES.ZIP", zipFileName ) )
         dictFiles.push_back( zipFileName );
 
       string indexFile = indicesDir + dictId;
@@ -2018,6 +2098,14 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
         idx.write( (uint32_t) dictionaryName.size() );
         idx.write( dictionaryName.data(), dictionaryName.size() );
+
+        string soundDictName = Utf8::encode( scanner.getSoundDictionaryName() );
+        if( !soundDictName.empty() )
+        {
+          idxHeader.hasSoundDictionaryName = 1;
+          idx.write( (uint32_t) soundDictName.size() );
+          idx.write( soundDictName.data(), soundDictName.size() );
+        }
 
         idxHeader.dslEncoding = scanner.getEncoding();
 
@@ -2062,7 +2150,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
                 if ( !abrvScanner.readNextLineWithoutComments( curString, curOffset ) || curString.empty() )
                 {
-                  gdWarning( "Warning: premature end of file %s\n", abrvFileName.c_str() );
+                  gdWarning( "Premature end of file %s\n", abrvFileName.c_str() );
                   eof = true;
                   break;
                 }
@@ -2148,7 +2236,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
             {
               if ( !isDslWs( curString[ x ] ) )
               {
-                gdWarning( "Warning: garbage string in %s at offset 0x%lX\n", i->c_str(), (unsigned long) curOffset );
+                gdWarning( "Garbage string in %s at offset 0x%lX\n", i->c_str(), (unsigned long) curOffset );
                 break;
               }
             }
@@ -2172,7 +2260,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
           {
             if ( ! ( hasString = scanner.readNextLineWithoutComments( curString, curOffset ) ) )
             {
-              gdWarning( "Warning: premature end of file %s\n", i->c_str() );
+              gdWarning( "Premature end of file %s\n", i->c_str() );
               break;
             }
 
@@ -2218,18 +2306,43 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
           uint32_t offset = curOffset;
           QVector< wstring > insidedHeadwords;
           unsigned linesInsideCard = 0;
+          int dogLine = 0;
+          bool wasEmptyLine = false;
+          int headwordLine = scanner.getLinesRead() - 2;
+          bool noSignificantLines = Folding::applyWhitespaceOnly( curString ).empty();
 
           // Skip the article's body
           for( ; ; )
           {
-
             if ( ! ( hasString = scanner.readNextLineWithoutComments( curString, curOffset ) )
                  || ( curString.size() && !isDslWs( curString[ 0 ] ) ) )
             {
               if( insideInsided )
+              {
+                gdWarning( "Unclosed tag '@' at line %i", dogLine );
                 insidedCards.append( InsidedCard( offset, curOffset - offset, insidedHeadwords ) );
+              }
+              if( noSignificantLines )
+                gdWarning( "Orphan headword at line %i", headwordLine );
+
               break;
             }
+
+            // Check for orphan strings
+
+            if( curString.empty() )
+            {
+              wasEmptyLine = true;
+              continue;
+            }
+            else
+            {
+              if( wasEmptyLine && !Folding::applyWhitespaceOnly( curString ).empty() )
+                gdWarning( "Orphan string at line %i", scanner.getLinesRead() - 1 );
+            }
+
+            if( noSignificantLines )
+              noSignificantLines = Folding::applyWhitespaceOnly( curString ).empty();
 
             // Find embedded cards
 
@@ -2241,6 +2354,21 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
               continue;
             }
+            else
+            {
+              // Embedded card tag must be placed at first position in line after spaces
+              if( !isAtSignFirst( curString ) )
+              {
+                gdWarning( "Unescaped '@' symbol at line %i", scanner.getLinesRead() - 1 );
+
+                if( insideInsided )
+                  linesInsideCard++;
+
+                continue;
+              }
+            }
+
+            dogLine = scanner.getLinesRead() - 1;
 
             // Handle embedded card
 

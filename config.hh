@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QKeySequence>
 #include <QSet>
+#include "cpp_features.hh"
 #include "ex.hh"
 
 #ifdef Q_OS_WIN
@@ -87,6 +88,7 @@ struct Group
   QString name, icon;
   QByteArray iconData;
   QKeySequence shortcut;
+  QString favoritesFolder;
   QVector< DictionaryRef > dictionaries;
   Config::MutedDictionaries mutedDictionaries; // Disabled via dictionary bar
   Config::MutedDictionaries popupMutedDictionaries; // Disabled via dictionary bar in popup
@@ -95,6 +97,7 @@ struct Group
 
   bool operator == ( Group const & other ) const
   { return id == other.id && name == other.name && icon == other.icon &&
+           favoritesFolder == other.favoritesFolder &&
            dictionaries == other.dictionaries && shortcut == other.shortcut &&
            mutedDictionaries == other.mutedDictionaries &&
            popupMutedDictionaries == other.popupMutedDictionaries &&
@@ -158,6 +161,8 @@ struct FullTextSearch
   bool useMaxDistanceBetweenWords;
   bool useMaxArticlesPerDictionary;
   bool enabled;
+  bool ignoreWordsOrder;
+  bool ignoreDiacritics;
   quint32 maxDictionarySize;
   QByteArray dialogGeometry;
   QString disabledTypes;
@@ -169,9 +174,74 @@ struct FullTextSearch
     useMaxDistanceBetweenWords( true ),
     useMaxArticlesPerDictionary( false ),
     enabled( true ),
+    ignoreWordsOrder( false ),
+    ignoreDiacritics( false ),
     maxDictionarySize( 0 )
   {}
 };
+
+/// This class encapsulates supported backend preprocessor logic,
+/// discourages duplicating backend names in code, which is error-prone.
+class InternalPlayerBackend
+{
+public:
+  /// Returns true if at least one backend is available.
+  static bool anyAvailable();
+  /// Returns the default backend or null backend if none is available.
+  static InternalPlayerBackend defaultBackend();
+  /// Returns the name list of supported backends.
+  static QStringList nameList();
+
+  /// Returns true if built with FFmpeg player support and the name matches.
+  bool isFfmpeg() const;
+  /// Returns true if built with Qt Multimedia player support and the name matches.
+  bool isQtmultimedia() const;
+
+  QString const & uiName() const
+  { return name; }
+
+  void setUiName( QString const & name_ )
+  { name = name_; }
+
+  bool operator == ( InternalPlayerBackend const & other ) const
+  { return name == other.name; }
+
+  bool operator != ( InternalPlayerBackend const & other ) const
+  { return ! operator == ( other ); }
+
+private:
+#ifdef MAKE_FFMPEG_PLAYER
+  static InternalPlayerBackend ffmpeg()
+  { return InternalPlayerBackend( "FFmpeg+libao" ); }
+#endif
+
+#ifdef MAKE_QTMULTIMEDIA_PLAYER
+  static InternalPlayerBackend qtmultimedia()
+  { return InternalPlayerBackend( "Qt Multimedia" ); }
+#endif
+
+  explicit InternalPlayerBackend( QString const & name_ ) : name( name_ )
+  {}
+
+  QString name;
+};
+
+#if defined( HAVE_X11 ) && QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+  // The ScanPopup window flags customization code has been tested
+  // only in X11 desktop environments and window managers.
+  // None of the window flags configurations I have tried works perfectly well
+  // in XFCE with Qt4. Let us enable customization code for Qt5 exclusively to
+  // avoid regressions with Qt4.
+  #define ENABLE_SPWF_CUSTOMIZATION
+#endif
+
+enum ScanPopupWindowFlags
+{
+  SPWF_default = 0,
+  SPWF_Popup,
+  SPWF_Tool
+};
+ScanPopupWindowFlags spwfFromInt( int id );
 
 /// Various user preferences
 struct Preferences
@@ -208,16 +278,22 @@ struct Preferences
   unsigned long scanPopupModifiers; // Combination of KeyboardState::Modifier
   bool scanPopupAltMode; // When you press modifier shortly after the selection
   unsigned scanPopupAltModeSecs;
+  bool ignoreOwnClipboardChanges;
   bool scanPopupUseUIAutomation;
   bool scanPopupUseIAccessibleEx;
   bool scanPopupUseGDMessage;
+  ScanPopupWindowFlags scanPopupUnpinnedWindowFlags;
+  bool scanPopupUnpinnedBypassWMHint;
   bool scanToMainWindow;
+#ifdef HAVE_X11
+  bool showScanFlag;
+#endif
 
   // Whether the word should be pronounced on page load, in main window/popup
   bool pronounceOnLoadMain, pronounceOnLoadPopup;
-  QString audioPlaybackProgram;
-  bool useExternalPlayer;
   bool useInternalPlayer;
+  InternalPlayerBackend internalPlayerBackend;
+  QString audioPlaybackProgram;
 
   ProxyServer proxyServer;
 
@@ -235,6 +311,9 @@ struct Preferences
   bool alwaysExpandOptionalParts;
 
   unsigned historyStoreInterval;
+  unsigned favoritesStoreInterval;
+
+  bool confirmFavoritesDeletion;
 
   bool collapseBigArticles;
   int articleSizeLimit;
@@ -243,6 +322,8 @@ struct Preferences
 #ifndef Q_WS_X11
   bool trackClipboardChanges;
 #endif
+
+  bool synonymSearchEnabled;
 
   QString addonStyle;
 
@@ -564,6 +645,7 @@ struct Class
   QString articleSavePath;   // Path to save articles
 
   bool pinPopupWindow; // Last pin status
+  bool popupWindowAlwaysOnTop; // Last status of pinned popup window
 
   QByteArray mainWindowState; // Binary state saved by QMainWindow
   QByteArray mainWindowGeometry; // Geometry saved by QMainWindow
@@ -585,6 +667,8 @@ struct Class
   /// Bigger headwords won't be indexed. For now, only in DSL.
   unsigned int maxHeadwordSize;
 
+  unsigned int maxHeadwordsToExpand;
+
   HeadwordsDialog headwordsDialog;
 
 #ifdef Q_OS_WIN
@@ -597,7 +681,8 @@ struct Class
   Class(): lastMainGroupId( 0 ), lastPopupGroupId( 0 ),
            pinPopupWindow( false ), showingDictBarNames( false ),
            usingSmallIconsInToolbars( false ),
-           maxPictureWidth( 0 ), maxHeadwordSize ( 256U )
+           maxPictureWidth( 0 ), maxHeadwordSize ( 256U ),
+           maxHeadwordsToExpand( 0 )
   {}
   Group * getGroup( unsigned id );
   Group const * getGroup( unsigned id ) const;
@@ -639,35 +724,38 @@ DEF_EX( exCantWriteConfigFile, "Can't write the configuration file", exError )
 DEF_EX( exMalformedConfigFile, "The configuration file is malformed", exError )
 
 /// Loads the configuration, or creates the default one if none is present
-Class load() throw( exError );
+Class load() THROW_SPEC( exError );
 
 /// Saves the configuration
-void save( Class const & ) throw( exError );
+void save( Class const & ) THROW_SPEC( exError );
 
 /// Returns the configuration file name.
 QString getConfigFileName();
 
 /// Returns the main configuration directory.
-QString getConfigDir() throw( exError );
+QString getConfigDir() THROW_SPEC( exError );
 
 /// Returns the index directory, where the indices are to be stored.
-QString getIndexDir() throw( exError );
+QString getIndexDir() THROW_SPEC( exError );
 
 /// Returns the filename of a .pid file which should store current pid of
 /// the process.
-QString getPidFileName() throw( exError );
+QString getPidFileName() THROW_SPEC( exError );
 
 /// Returns the filename of a history file which stores search history.
-QString getHistoryFileName() throw( exError );
+QString getHistoryFileName() THROW_SPEC( exError );
+
+/// Returns the filename of a favorities file.
+QString getFavoritiesFileName() THROW_SPEC( exError );
 
 /// Returns the user .css file name.
-QString getUserCssFileName() throw( exError );
+QString getUserCssFileName() THROW_SPEC( exError );
 
 /// Returns the user .css file name used for printing only.
-QString getUserCssPrintFileName() throw( exError );
+QString getUserCssPrintFileName() THROW_SPEC( exError );
 
 /// Returns the user .css file name for the Qt interface customization.
-QString getUserQtCssFileName() throw( exError );
+QString getUserQtCssFileName() THROW_SPEC( exError );
 
 /// Returns the program's data dir. Under Linux that would be something like
 /// /usr/share/apps/goldendict, under Windows C:/Program Files/GoldenDict.

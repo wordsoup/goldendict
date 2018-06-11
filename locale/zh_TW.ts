@@ -126,7 +126,7 @@
     </message>
     <message>
         <source>Failed to run a player to play sound file: %1</source>
-        <translation>沒有可用的播放器，無法開啟音訊檔案：%1</translation>
+        <translation type="obsolete">沒有可用的播放器，無法開啟音訊檔案：%1</translation>
     </message>
     <message>
         <source>&amp;Next</source>
@@ -286,7 +286,7 @@
     </message>
     <message>
         <source>WARNING: FFmpeg Audio Player: %1</source>
-        <translation>警告： FFmpeg 音訊撥放程式： %1</translation>
+        <translation type="obsolete">警告： FFmpeg 音訊撥放程式： %1</translation>
     </message>
     <message>
         <source>Copy as text</source>
@@ -303,6 +303,14 @@
     <message>
         <source>Video: %1</source>
         <translation>影像： %1</translation>
+    </message>
+    <message>
+        <source>Failed to play sound file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WARNING: Audio Player: %1</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -325,7 +333,7 @@ between classic and school orthography in cyrillic)</source>
     <name>ChineseConversion</name>
     <message>
         <source>GroupBox</source>
-        <translation>群組框</translation>
+        <translation type="obsolete">群組框</translation>
     </message>
     <message>
         <source>Enable conversion between simplified and traditional Chinese characters</source>
@@ -370,6 +378,10 @@ between classic and school orthography in cyrillic)</source>
     <message>
         <source>Traditional to simplified Chinese conversion</source>
         <translation>繁體字轉換為簡體字</translation>
+    </message>
+    <message>
+        <source>Chinese Conversion</source>
+        <translation>中文轉換</translation>
     </message>
 </context>
 <context>
@@ -432,6 +444,10 @@ between classic and school orthography in cyrillic)</source>
     <message>
         <source>Can&apos;t read the specified image file.</source>
         <translation>無法讀取指定的影像檔案。</translation>
+    </message>
+    <message>
+        <source>Favorites folder:</source>
+        <translation>我的最愛資料夾：</translation>
     </message>
 </context>
 <context>
@@ -825,6 +841,36 @@ between classic and school orthography in cyrillic)</source>
     </message>
 </context>
 <context>
+    <name>FavoritesModel</name>
+    <message>
+        <source>Error in favorities file</source>
+        <translation>我的最愛檔案發生錯誤</translation>
+    </message>
+</context>
+<context>
+    <name>FavoritesPaneWidget</name>
+    <message>
+        <source>&amp;Delete Selected</source>
+        <translation>刪除選擇的部分(&amp;D)</translation>
+    </message>
+    <message>
+        <source>Copy Selected</source>
+        <translation>複製選擇的部分</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>新增資料夾</translation>
+    </message>
+    <message>
+        <source>Favorites:</source>
+        <translation>我的最愛：</translation>
+    </message>
+    <message>
+        <source>All selected items will be deleted. Continue?</source>
+        <translation>所有選擇的項目都會被刪除。是否繼續？</translation>
+    </message>
+</context>
+<context>
     <name>Forvo::ForvoArticleRequest</name>
     <message>
         <source>XML parse error: %1 at %2,%3</source>
@@ -900,6 +946,14 @@ between classic and school orthography in cyrillic)</source>
     <message>
         <source>Help</source>
         <translation>說明</translation>
+    </message>
+    <message>
+        <source>Ignore words order</source>
+        <translation>忽略單字排序</translation>
+    </message>
+    <message>
+        <source>Ignore diacritics</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -2476,6 +2530,82 @@ To find &apos;*&apos;, &apos;?&apos;, &apos;[&apos;, &apos;]&apos; symbols use &
         <source>Now indexing for full-text search: </source>
         <translation>正在建立全文搜尋用的索引：</translation>
     </message>
+    <message>
+        <source>Favor&amp;ites Pane</source>
+        <translation>我的最愛窗格(&amp;I)</translation>
+    </message>
+    <message>
+        <source>Show</source>
+        <translation>顯示</translation>
+    </message>
+    <message>
+        <source>Export</source>
+        <translation>匯出</translation>
+    </message>
+    <message>
+        <source>Import</source>
+        <translation>匯入</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation>新增</translation>
+    </message>
+    <message>
+        <source>Add current tab to Favorites</source>
+        <translation>將目前分頁新增到我的最愛</translation>
+    </message>
+    <message>
+        <source>Export to list</source>
+        <translation>匯出到清單</translation>
+    </message>
+    <message>
+        <source>Export Favorites to file</source>
+        <translation>匯出我的最愛</translation>
+    </message>
+    <message>
+        <source>XML files (*.xml);;All files (*.*)</source>
+        <translation>XML 檔案 (*.xml);;所有檔案 (*.*)</translation>
+    </message>
+    <message>
+        <source>Favorites export complete</source>
+        <translation>我的最愛匯出完成</translation>
+    </message>
+    <message>
+        <source>Export Favorites to file as plain list</source>
+        <translation>以純文字清單方式匯出我的最愛</translation>
+    </message>
+    <message>
+        <source>Import Favorites from file</source>
+        <translation>從檔案匯入我的最愛</translation>
+    </message>
+    <message>
+        <source>Favorites import complete</source>
+        <translation>我的最愛匯入完成</translation>
+    </message>
+    <message>
+        <source>Data parsing error</source>
+        <translation>資料解析錯誤</translation>
+    </message>
+    <message>
+        <source>Favo&amp;rites</source>
+        <translation>我的最愛(&amp;R)</translation>
+    </message>
+    <message>
+        <source>Ctrl+E</source>
+        <translation>Ctrl+E</translation>
+    </message>
+    <message>
+        <source>Add all tabs to Favorites</source>
+        <translation>將所有分頁新增到我的最愛</translation>
+    </message>
+    <message>
+        <source>Remove current tab from Favorites</source>
+        <translation>將目前分頁從我的最愛中移除</translation>
+    </message>
+    <message>
+        <source>Remove headword &quot;%1&quot; from Favorites?</source>
+        <translation>確定要將詞條 &quot;%1&quot; 從我的最愛中移除嗎？</translation>
+    </message>
 </context>
 <context>
     <name>Mdx::MdxArticleRequest</name>
@@ -2519,6 +2649,13 @@ To find &apos;*&apos;, &apos;?&apos;, &apos;[&apos;, &apos;]&apos; symbols use &
     <message>
         <source>Icon</source>
         <translation>圖示</translation>
+    </message>
+</context>
+<context>
+    <name>MultimediaAudioPlayer</name>
+    <message>
+        <source>Couldn&apos;t open audio buffer for reading.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -2807,7 +2944,7 @@ be the last ones.</source>
         <translation>系統預設</translation>
     </message>
     <message>
-        <source>When enabled, an icon appears in the sytem tray area which can be used
+        <source>When enabled, an icon appears in the system tray area which can be used
 to open main window and perform other tasks.</source>
         <translation>啟用此選項，將會啟用系統匣圖示。
 可用來顯示主視窗以及執行其他工作。</translation>
@@ -3118,7 +3255,7 @@ It is not needed to select this option if you don&apos;t use such programs.</sou
     </message>
     <message>
         <source>Specify the maximum number of entries to keep in history.</source>
-        <translation>設定歷史記錄最多保存的詞條數量。</translation>
+        <translation>設定歷史記錄最多儲存的詞條數量。</translation>
     </message>
     <message>
         <source>Maximum history size:</source>
@@ -3150,11 +3287,11 @@ It is not needed to select this option if you don&apos;t use such programs.</sou
     </message>
     <message>
         <source>Play audio files via FFmpeg(libav) and libao</source>
-        <translation>使用 FFmpeg(libav) 和 libao 播放音訊檔案。</translation>
+        <translation type="obsolete">使用 FFmpeg(libav) 和 libao 播放音訊檔案。</translation>
     </message>
     <message>
         <source>Use internal player</source>
-        <translation>使用內部播放器</translation>
+        <translation type="obsolete">使用內部播放器</translation>
     </message>
     <message>
         <source>Some sites detect GoldenDict via HTTP headers and block the requests.
@@ -3222,6 +3359,56 @@ Enable this option to workaround the problem.</source>
         <source>Help language</source>
         <translation>說明語言</translation>
     </message>
+    <message>
+        <source>Turn this option on to enable extra articles search via synonym lists
+from Stardict, Babylon and GLS dictionaries</source>
+        <translation>啟用此選項可以透過同義詞清單開啟額外搜尋功能，
+清單來自 Stardict、Babylon 和 GLS 的字典</translation>
+    </message>
+    <message>
+        <source>Extra search via synonyms</source>
+        <translation>同義詞額外搜尋功能</translation>
+    </message>
+    <message>
+        <source>Favorites</source>
+        <translation>我的最愛</translation>
+    </message>
+    <message>
+        <source>Favorites saving interval. If set to 0 Favorites will be saved only during exit.</source>
+        <translation>我的最愛內容儲存間隔。若設定為 0 則只在程式結束時儲存。</translation>
+    </message>
+    <message>
+        <source>Turn this option on to confirm every operation of items deletion</source>
+        <translation>啟用此選項以在每次進行刪除操作時進行確認</translation>
+    </message>
+    <message>
+        <source>Confirmation for items deletion</source>
+        <translation>刪除項目時進行確認</translation>
+    </message>
+    <message>
+        <source>Show a flag window before showing popup window, click the flag to show popup window. </source>
+        <translation>顯示彈出視窗之前先顯示一個旗標視窗，點選旗標以顯示彈出視窗。</translation>
+    </message>
+    <message>
+        <source>Show scan flag when word is selected</source>
+        <translation>單字被選取時顯示掃描旗標</translation>
+    </message>
+    <message>
+        <source>Play audio files via built-in audio support</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use internal player:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose audio back end</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter audio player command line</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ProgramTypeEditor</name>
@@ -3239,7 +3426,7 @@ Enable this option to workaround the problem.</source>
     </message>
     <message>
         <source>Prefix Match</source>
-        <translation>前綴符合</translation>
+        <translation>字首符合</translation>
     </message>
     <message>
         <source>Unknown</source>
@@ -3362,6 +3549,45 @@ Enable this option to workaround the problem.</source>
         <source>avcodec_alloc_frame() failed.</source>
         <translation>avcodec_alloc_frame() failed.</translation>
     </message>
+    <message>
+        <source>Copyright: %1%2</source>
+        <translation>Copyright: %1%2</translation>
+    </message>
+    <message>
+        <source>Version: %1%2</source>
+        <translation>版本: %1%2</translation>
+    </message>
+    <message>
+        <source>Author: %1%2</source>
+        <translation>作者: %1%2</translation>
+    </message>
+    <message>
+        <source>E-mail: %1%2</source>
+        <translation>電子郵件: %1%2</translation>
+    </message>
+    <message>
+        <source>Title: %1%2</source>
+        <translation>標題: %1%2</translation>
+    </message>
+    <message>
+        <source>Website: %1%2</source>
+        <translation>網站: %1%2</translation>
+    </message>
+    <message>
+        <source>Date: %1%2</source>
+        <translation>日期: %1%2</translation>
+    </message>
+    <message>
+        <source>avcodec_alloc_context3() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>QWebPage</name>
+    <message>
+        <source>Select All</source>
+        <translation type="obsolete">全選</translation>
+    </message>
 </context>
 <context>
     <name>QuickFilterLine</name>
@@ -3392,6 +3618,10 @@ Enable this option to workaround the problem.</source>
         <source>The referenced resource failed to download.</source>
         <translation>所引用的資源下載失敗。</translation>
     </message>
+    <message>
+        <source>WARNING: %1</source>
+        <translation>警告： %1</translation>
+    </message>
 </context>
 <context>
     <name>Romaji</name>
@@ -3409,6 +3639,13 @@ Enable this option to workaround the problem.</source>
     <message>
         <source>Russian Transliteration</source>
         <translation>俄文轉寫</translation>
+    </message>
+</context>
+<context>
+    <name>ScanFlag</name>
+    <message>
+        <source>MainWindow</source>
+        <translation>主視窗</translation>
     </message>
 </context>
 <context>
@@ -3443,12 +3680,13 @@ Enable this option to workaround the problem.</source>
     </message>
     <message>
         <source>Shows or hides the dictionary bar</source>
-        <translation>顯示或隱藏字典欄</translation>
+        <translation>顯示或隱藏字典列</translation>
     </message>
     <message>
         <source>Use this to pin down the window so it would stay on screen,
 could be resized or managed in other ways.</source>
-        <translation>使用此按鈕可以固定視窗，以便它能停留在螢幕上進行改變大小等相關視窗管理操作。</translation>
+        <translation>使用此按鈕可以釘選視窗，以便它能停留在螢幕上，
+調整大小等相關視窗管理操作。</translation>
     </message>
     <message>
         <source>Send word to main window (Alt+W)</source>
@@ -3473,6 +3711,14 @@ could be resized or managed in other ways.</source>
     <message>
         <source>%1 - %2</source>
         <translation>%1 - %2</translation>
+    </message>
+    <message>
+        <source>Add word to Favorites (Ctrl+E)</source>
+        <translation>新增單字到我的最愛 (Ctrl+E)</translation>
+    </message>
+    <message>
+        <source>Always stay on top of all other windows</source>
+        <translation>最上層顯示在其他所有視窗</translation>
     </message>
 </context>
 <context>
@@ -3904,13 +4150,6 @@ Big-5 使用%GDBIG5%，Big5-HKSCS 使用 %GDBIG5HKSCS% ，GBK 和 GB18030 使用
     <message>
         <source>WARNING: %1</source>
         <translation>警告： %1</translation>
-    </message>
-</context>
-<context>
-    <name>QWebPage</name>
-    <message>
-        <source>Select All</source>
-        <translation>全選</translation>
     </message>
 </context>
 </TS>

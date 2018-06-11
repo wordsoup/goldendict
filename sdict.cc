@@ -26,8 +26,12 @@
 #include <QSemaphore>
 #include <QThreadPool>
 #include <QAtomicInt>
-#include <QRegExp>
 #include <QDebug>
+#include <QRegExp>
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#endif
 
 #include "ufile.hh"
 #include "qt4x5.hh"
@@ -160,14 +164,16 @@ class SdictDictionary: public BtreeIndexing::BtreeDictionary
     virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                         vector< wstring > const & alts,
                                                         wstring const & )
-      throw( std::exception );
+      THROW_SPEC( std::exception );
 
     virtual QString const & getDescription();
 
     virtual sptr< Dictionary::DataRequest > getSearchResults( QString const & searchString,
                                                               int searchMode, bool matchCase,
                                                               int distanceBetweenWords,
-                                                              int maxResults );
+                                                              int maxResults,
+                                                              bool ignoreWordsOrder,
+                                                              bool ignoreDiacritics );
     virtual void getArticleText( uint32_t articleAddress, QString & headword, QString & text );
 
     virtual void makeFTSIndex(QAtomicInt & isCancelled, bool firstIteration );
@@ -285,6 +291,30 @@ string SdictDictionary::convert( string const & in )
 
     QString result = QString::fromUtf8( inConverted.c_str(), inConverted.size() );
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    result.replace( QRegularExpression( "<\\s*(p|br)\\s*>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "<br/>" );
+    result.remove( QRegularExpression( "<\\s*/p\\s*>",
+                                       QRegularExpression::CaseInsensitiveOption ) );
+
+    result.replace( QRegularExpression( "<\\s*t\\s*>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "<span class=\"sdict_tr\" dir=\"ltr\">" );
+    result.replace( QRegularExpression( "<\\s*f\\s*>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "<span class=\"sdict_forms\">" );
+    result.replace( QRegularExpression( "<\\s*/(t|f)\\s*>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "</span>" );
+
+    result.replace( QRegularExpression( "<\\s*l\\s*>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "<ul>" );
+    result.replace( QRegularExpression( "<\\s*/l\\s*>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "</ul>" );
+#else
     result.replace( QRegExp( "<\\s*(p|br)\\s*>", Qt::CaseInsensitive ), "<br/>" );
     result.remove( QRegExp( "<\\s*/p\\s*>", Qt::CaseInsensitive ) );
 
@@ -294,14 +324,15 @@ string SdictDictionary::convert( string const & in )
 
     result.replace( QRegExp( "<\\s*l\\s*>", Qt::CaseInsensitive ), "<ul>" );
     result.replace( QRegExp( "<\\s*/l\\s*>", Qt::CaseInsensitive ), "</ul>" );
+#endif
 
     // Links handling
 
     int n = 0;
     for( ; ; )
     {
-      static QRegExp start_link_tag( "<\\s*r\\s*>", Qt::CaseInsensitive );
-      static QRegExp end_link_tag( "<\\s*/r\\s*>", Qt::CaseInsensitive );
+      QRegExp start_link_tag( "<\\s*r\\s*>", Qt::CaseInsensitive );
+      QRegExp end_link_tag( "<\\s*/r\\s*>", Qt::CaseInsensitive );
 
       n = result.indexOf( start_link_tag, n );
       if( n < 0 )
@@ -446,9 +477,11 @@ void SdictDictionary::getArticleText( uint32_t articleAddress, QString & headwor
 sptr< Dictionary::DataRequest > SdictDictionary::getSearchResults( QString const & searchString,
                                                                    int searchMode, bool matchCase,
                                                                    int distanceBetweenWords,
-                                                                   int maxResults )
+                                                                   int maxResults,
+                                                                   bool ignoreWordsOrder,
+                                                                   bool ignoreDiacritics )
 {
-  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults );
+  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults, ignoreWordsOrder, ignoreDiacritics );
 }
 
 /// SdictDictionary::getArticle()
@@ -633,7 +666,7 @@ void SdictArticleRequest::run()
 sptr< Dictionary::DataRequest > SdictDictionary::getArticle( wstring const & word,
                                                              vector< wstring > const & alts,
                                                              wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new SdictArticleRequest( word, alts, *this );
 }
@@ -643,8 +676,9 @@ QString const& SdictDictionary::getDescription()
   if( !dictionaryDescription.isEmpty() )
     return dictionaryDescription;
 
-  dictionaryDescription = QString::fromLatin1( "Title: " )
-                          + QString::fromUtf8( getName().c_str() );
+  dictionaryDescription = QString( QObject::tr( "Title: %1%2" ) )
+                          .arg( QString::fromUtf8( getName().c_str() ) )
+                          .arg( "\n\n" );
 
   try
   {
@@ -674,8 +708,9 @@ QString const& SdictDictionary::getDescription()
     else
       str = string( data.data(), size );
 
-    dictionaryDescription += QString::fromLatin1( "\n\nCopyright: " )
-                             + QString::fromUtf8( str.c_str(), str.size() );
+    dictionaryDescription += QString( QObject::tr( "Copyright: %1%2" ) )
+                             .arg( QString::fromUtf8( str.c_str(), str.size() ) )
+                             .arg( "\n\n" );
 
     df.seek( dictHeader.versionOffset );
     df.read( &size, sizeof( size ) );
@@ -689,8 +724,9 @@ QString const& SdictDictionary::getDescription()
     else
       str = string( data.data(), size );
 
-    dictionaryDescription += QString::fromLatin1( "\n\nVersion: " )
-                             + QString::fromUtf8( str.c_str(), str.size() );
+    dictionaryDescription += QString( QObject::tr( "Version: %1%2" ) )
+                             .arg( QString::fromUtf8( str.c_str(), str.size() ) )
+                             .arg( "\n\n" );
   }
   catch( std::exception &ex )
   {
@@ -709,7 +745,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                                       vector< string > const & fileNames,
                                       string const & indicesDir,
                                       Dictionary::Initializing & initializing )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 

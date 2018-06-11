@@ -22,9 +22,14 @@
 
 #include <QImage>
 #include <QPainter>
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#else
 #include <QRegExp>
+#endif
 
 #include "qt4x5.hh"
+#include "zipfile.hh"
 
 namespace Dictionary {
 
@@ -73,7 +78,7 @@ size_t WordSearchRequest::matchesCount()
   return matches.size();
 }
 
-WordMatch WordSearchRequest::operator [] ( size_t index ) throw( exIndexOutOfRange )
+WordMatch WordSearchRequest::operator [] ( size_t index ) THROW_SPEC( exIndexOutOfRange )
 {
   Mutex::Lock _( dataMutex );
   
@@ -83,7 +88,7 @@ WordMatch WordSearchRequest::operator [] ( size_t index ) throw( exIndexOutOfRan
   return matches[ index ];
 }
 
-vector< WordMatch > & WordSearchRequest::getAllMatches() throw( exRequestUnfinished )
+vector< WordMatch > & WordSearchRequest::getAllMatches() THROW_SPEC( exRequestUnfinished )
 {
   if ( !isFinished() )
     throw exRequestUnfinished();
@@ -112,7 +117,7 @@ long DataRequest::dataSize()
 }
 
 void DataRequest::getDataSlice( size_t offset, size_t size, void * buffer )
-  throw( exSliceOutOfRange )
+  THROW_SPEC( exSliceOutOfRange )
 {
   if ( size == 0 )
     return;
@@ -125,7 +130,7 @@ void DataRequest::getDataSlice( size_t offset, size_t size, void * buffer )
   memcpy( buffer, &data[ offset ], size );
 }
 
-vector< char > & DataRequest::getFullData() throw( exRequestUnfinished )
+vector< char > & DataRequest::getFullData() THROW_SPEC( exRequestUnfinished )
 {
   if ( !isFinished() )
     throw exRequestUnfinished();
@@ -147,13 +152,13 @@ sptr< WordSearchRequest > Class::stemmedMatch( wstring const & /*str*/,
                                                unsigned /*minLength*/,
                                                unsigned /*maxSuffixVariation*/,
                                                unsigned long /*maxResults*/ )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new WordSearchRequestInstant();
 }
 
 sptr< WordSearchRequest > Class::findHeadwordsForSynonym( wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new WordSearchRequestInstant();
 }
@@ -165,12 +170,12 @@ vector< wstring > Class::getAlternateWritings( wstring const & )
 }
 
 sptr< DataRequest > Class::getResource( string const & /*name*/ )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new DataRequestInstant( false );
 }
 
-sptr< DataRequest > Class::getSearchResults(const QString &, int, bool, int, int )
+sptr< DataRequest > Class::getSearchResults(const QString &, int, bool, int, int, bool, bool )
 {
   return new DataRequestInstant( false );
 }
@@ -277,6 +282,17 @@ void Class::isolateCSS( QString & css, QString const & wrapperSelector )
   if( css.isEmpty() )
     return;
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+  QRegularExpression reg1( "\\/\\*(?:.(?!\\*\\/))*.?\\*\\/",
+                           QRegularExpression::DotMatchesEverythingOption );
+  QRegularExpression reg2( "[ \\*\\>\\+,;:\\[\\{\\]]" );
+  QRegularExpression reg3( "[,;\\{]" );
+#else
+  QRegExp reg1( "\\/\\*(?:.(?!\\*\\/))*.?\\*\\/" );
+  QRegExp reg2( "[ \\*\\>\\+,;:\\[\\{\\]]" );
+  QRegExp reg3( "[,;\\{]" );
+#endif
+
   int currentPos = 0;
   QString newCSS;
   QString prefix( "#gdfrom-" );
@@ -285,7 +301,7 @@ void Class::isolateCSS( QString & css, QString const & wrapperSelector )
     prefix += " " + wrapperSelector;
 
   // Strip comments
-  css.replace( QRegExp( "\\/\\*[^*]*\\*+([^/][^*]*\\*+)*\\/" ), QString() );
+  css.replace( reg1, QString() );
 
   for( ; ; )
   {
@@ -298,7 +314,10 @@ void Class::isolateCSS( QString & css, QString const & wrapperSelector )
       // @ rules
 
       int n = currentPos;
-      if( css.mid( currentPos, 7 ).compare( "@import", Qt::CaseInsensitive ) == 0 )
+      if( css.mid( currentPos, 7 ).compare( "@import", Qt::CaseInsensitive ) == 0
+          || css.mid( currentPos, 10 ).compare( "@font-face", Qt::CaseInsensitive ) == 0
+          || css.mid( currentPos, 10 ).compare( "@namespace", Qt::CaseInsensitive ) == 0
+          || css.mid( currentPos, 8 ).compare( "@charset", Qt::CaseInsensitive ) == 0 )
       {
         // Copy rule as is.
         n = css.indexOf( ';', currentPos );
@@ -351,12 +370,35 @@ void Class::isolateCSS( QString & css, QString const & wrapperSelector )
       continue;
     }
 
-    if( ch.isLetter() || ch == '.' || ch == '#' || ch == '*' || ch == '\\' )
+    if( ch.isLetter() || ch == '.' || ch == '#' || ch == '*' || ch == '\\' || ch == ':' )
     {
+      if( ch.isLetter() || ch == '*' )
+      {
+        // Check for namespace prefix
+        QChar chr;
+        for( int i = currentPos; i < css.length(); i++ )
+        {
+          chr = css[ i ];
+          if( chr.isLetterOrNumber() || chr.isMark() || chr == '_' || chr == '-'
+              || ( chr == '*' && i == currentPos ) )
+            continue;
+
+          if( chr == '|' )
+          {
+            // Namespace prefix found, copy it as is
+            newCSS.append( css.mid( currentPos, i - currentPos + 1 ) );
+            currentPos = i + 1;
+          }
+          break;
+        }
+        if ( chr == '|' )
+          continue;
+      }
+
       // This is some selector.
       // We must to add the isolate prefix to it.
 
-      int n = css.indexOf( QRegExp( "[ \\*\\>\\+,;:\\[\\{\\]]" ), currentPos + 1 );
+      int n = css.indexOf( reg2, currentPos + 1 );
       QString s = css.mid( currentPos, n < 0 ? n : n - currentPos );
       if( n < 0 )
       {
@@ -375,7 +417,7 @@ void Class::isolateCSS( QString & css, QString const & wrapperSelector )
         newCSS.append( prefix + " " );
       }
 
-      n = css.indexOf( QRegExp( "[,;\\{]" ), currentPos );
+      n = css.indexOf( reg3, currentPos );
       s = css.mid( currentPos, n < 0 ? n : n - currentPos );
       newCSS.append( s );
       if( n < 0 )
@@ -443,15 +485,26 @@ bool needToRebuildIndex( vector< string > const & dictionaryFiles,
   for( std::vector< string >::const_iterator i = dictionaryFiles.begin();
        i != dictionaryFiles.end(); ++i )
   {
-    QFileInfo fileInfo( FsEncoding::decode( i->c_str() ) );
+    QString name = FsEncoding::decode( i->c_str() );
+    QFileInfo fileInfo( name );
+    unsigned long ts;
 
     if( fileInfo.isDir() )
       continue;
 
-    if ( !fileInfo.exists() )
-      return true;
-
-    unsigned long ts = fileInfo.lastModified().toTime_t();
+    if( name.toLower().endsWith( ".zip" ) )
+    {
+      ZipFile::SplitZipFile zf( name );
+      if( !zf.exists() )
+        return true;
+      ts = zf.lastModified().toTime_t();
+    }
+    else
+    {
+      if ( !fileInfo.exists() )
+        return true;
+      ts = fileInfo.lastModified().toTime_t();
+    }
 
     if ( ts > lastModified )
       lastModified = ts;

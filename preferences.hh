@@ -33,6 +33,8 @@ private slots:
 
   void enableScanPopupToggled( bool );
   void enableScanPopupModifiersToggled( bool );
+  void showScanFlagToggled( bool b );
+  void on_scanPopupUnpinnedWindowFlags_currentIndexChanged( int index );
 
   void wholeAltClicked( bool );
   void wholeCtrlClicked( bool );

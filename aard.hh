@@ -15,8 +15,9 @@ using std::string;
 vector< sptr< Dictionary::Class > > makeDictionaries(
                                       vector< string > const & fileNames,
                                       string const & indicesDir,
-                                      Dictionary::Initializing & )
-  throw( std::exception );
+                                      Dictionary::Initializing &,
+                                      unsigned maxHeadwordsToExpand )
+  THROW_SPEC( std::exception );
 
 }
 

@@ -6,6 +6,7 @@
 #include <QRegExp>
 #include <QAbstractListModel>
 #include <QList>
+#include <QAction>
 
 #include "dictionary.hh"
 #include "ui_fulltextsearch.h"
@@ -41,20 +42,21 @@ struct FtsHeadword
 {
   QString headword;
   QStringList dictIDs;
+  QStringList foundHiliteRegExps;
+  bool matchCase;
 
-  FtsHeadword( QString const & headword_, QString const & dictid_ ) :
-    headword( headword_ )
+  FtsHeadword( QString const & headword_, QString const & dictid_,
+               QStringList hilites, bool match_case ) :
+    headword( headword_ ),
+    foundHiliteRegExps( hilites ),
+    matchCase( match_case )
   {
     dictIDs.append( dictid_ );
   }
 
-  bool operator <( FtsHeadword const & other ) const
-  {
-    if( headword[ 0 ] == '\"' || headword[ 0 ] == '\'' )
-      return headword.mid( 1 ).localeAwareCompare( other.headword ) < 0;
-    else
-      return headword.localeAwareCompare( other.headword ) < 0;
-  }
+  QString trimQuotes( QString const & ) const;
+
+  bool operator <( FtsHeadword const & other ) const;
 
   bool operator ==( FtsHeadword const & other ) const
   { return headword.compare( other.headword, Qt::CaseInsensitive ) == 0; }
@@ -173,6 +175,8 @@ class FullTextSearchDialog : public QDialog
   std::vector< Instances::Group > const & groups;
   unsigned group;
   std::vector< sptr< Dictionary::Class > > activeDicts;
+  bool ignoreWordsOrder;
+  bool ignoreDiacritics;
 
   std::list< sptr< Dictionary::DataRequest > > searchReqs;
 
@@ -214,6 +218,8 @@ private slots:
   void saveData();
   void accept();
   void setLimitsUsing();
+  void ignoreWordsOrderClicked();
+  void ignoreDiacriticsClicked();
   void searchReqFinished();
   void reject();
   void itemClicked( QModelIndex const & idx );
@@ -222,7 +228,7 @@ private slots:
 
 signals:
   void showTranslationFor( QString const &, QStringList const & dictIDs,
-                           QRegExp const & searchRegExp );
+                           QRegExp const & searchRegExp, bool ignoreDiacritics );
   void closeDialog();
 };
 

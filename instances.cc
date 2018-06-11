@@ -11,14 +11,18 @@ using std::set;
 using std::string;
 
 Group::Group( Config::Group const & cfgGroup,
-              vector< sptr< Dictionary::Class > > const & allDictionaries ):
+              vector< sptr< Dictionary::Class > > const & allDictionaries,
+              Config::Group const & inactiveGroup ):
   id( cfgGroup.id ),
   name( cfgGroup.name ),
   icon( cfgGroup.icon ),
+  favoritesFolder( cfgGroup.favoritesFolder ),
   shortcut( cfgGroup.shortcut )
 {
   if ( !cfgGroup.iconData.isEmpty() )
     iconData = iconFromData( cfgGroup.iconData );
+
+  vector< sptr< Dictionary::Class > > groupDicts;
 
   for( unsigned x = 0; x < (unsigned)cfgGroup.dictionaries.size(); ++x )
   {
@@ -29,7 +33,7 @@ Group::Group( Config::Group const & cfgGroup,
     for( unsigned y = allDictionaries.size(); y--; )
       if ( allDictionaries[ y ]->getId() == id )
       {
-        dictionaries.push_back( allDictionaries[ y ] );
+        groupDicts.push_back( allDictionaries[ y ] );
         added = true;
         break;
       }
@@ -47,10 +51,10 @@ Group::Group( Config::Group const & cfgGroup,
         // if it with such name was already added or presented in rest of list
 
         unsigned n;
-        for( n = 0; n < dictionaries.size(); n++ )
-          if( dictionaries[ n ]->getName() == name )
+        for( n = 0; n < groupDicts.size(); n++ )
+          if( groupDicts[ n ]->getName() == name )
             break;
-        if( n < dictionaries.size() )
+        if( n < groupDicts.size() )
           continue;
 
         for( n = x + 1; n < (unsigned)cfgGroup.dictionaries.size(); n++ )
@@ -62,11 +66,26 @@ Group::Group( Config::Group const & cfgGroup,
         for( unsigned y = 0; y < allDictionaries.size(); ++y )
           if ( allDictionaries[ y ]->getName() == name )
           {
-            dictionaries.push_back( allDictionaries[ y ] );
+            groupDicts.push_back( allDictionaries[ y ] );
             break;
           }
       }
     }
+  }
+
+  // Remove inactive dictionaries
+
+  if( inactiveGroup.dictionaries.isEmpty() )
+    dictionaries = groupDicts;
+  else
+  {
+    set< string > inactiveSet;
+    for( int i = 0; i < inactiveGroup.dictionaries.size(); i++ )
+      inactiveSet.insert( inactiveGroup.dictionaries[ i ].id.toStdString() );
+
+    for( unsigned i = 0; i < groupDicts.size(); i++ )
+      if( inactiveSet.find( groupDicts[ i ]->getId() ) == inactiveSet.end() )
+        dictionaries.push_back( groupDicts[ i ] );
   }
 }
 
@@ -82,6 +101,7 @@ Config::Group Group::makeConfigGroup()
   result.name = name;
   result.icon = icon;
   result.shortcut = shortcut;
+  result.favoritesFolder = favoritesFolder;
 
   if ( !iconData.isNull() )
   {

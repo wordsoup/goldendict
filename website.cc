@@ -8,7 +8,13 @@
 #include <QTextCodec>
 #include <QDir>
 #include <QFileInfo>
+#include "gddebug.hh"
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#else
 #include <QRegExp>
+#endif
 
 namespace WebSite {
 
@@ -54,14 +60,14 @@ public:
   { return 0; }
 
   virtual sptr< WordSearchRequest > prefixMatch( wstring const & word,
-                                                 unsigned long ) throw( std::exception );
+                                                 unsigned long ) THROW_SPEC( std::exception );
 
   virtual sptr< DataRequest > getArticle( wstring const &,
                                           vector< wstring > const & alts,
                                           wstring const & context )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
-  virtual sptr< Dictionary::DataRequest > getResource( string const & name ) throw( std::exception );
+  virtual sptr< Dictionary::DataRequest > getResource( string const & name ) THROW_SPEC( std::exception );
 
   void isolateWebCSS( QString & css );
 
@@ -71,7 +77,7 @@ protected:
 };
 
 sptr< WordSearchRequest > WebSiteDictionary::prefixMatch( wstring const & /*word*/,
-                                                          unsigned long ) throw( std::exception )
+                                                          unsigned long ) THROW_SPEC( std::exception )
 {
   sptr< WordSearchRequestInstant > sr = new WordSearchRequestInstant;
 
@@ -194,6 +200,7 @@ void WebSiteArticleRequest::requestFinished( QNetworkReply * r )
     QUrl redirectUrl = possibleRedirectUrl.toUrl();
     if( !redirectUrl.isEmpty() )
     {
+      disconnect( netReply, 0, 0, 0 );
       netReply->deleteLater();
       netReply = mgr.get( QNetworkRequest( redirectUrl ) );
 #ifndef QT_NO_OPENSSL
@@ -221,6 +228,84 @@ void WebSiteArticleRequest::requestFinished( QNetworkReply * r )
     while( !base.isEmpty() && !base.endsWith( "/" ) )
       base.chop( 1 );
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    QRegularExpression tags( "<\\s*(a|link|img|script)\\s+[^>]*(src|href)\\s*=\\s*['\"][^>]+>",
+                             QRegularExpression::CaseInsensitiveOption );
+    QRegularExpression links( "\\b(src|href)\\s*=\\s*(['\"])([^'\"]+['\"])",
+                              QRegularExpression::CaseInsensitiveOption );
+    int pos = 0;
+    QString articleNewString;
+    QRegularExpressionMatchIterator it = tags.globalMatch( articleString );
+    while( it.hasNext() )
+    {
+      QRegularExpressionMatch match = it.next();
+      articleNewString += articleString.midRef( pos, match.capturedStart() - pos );
+      pos = match.capturedEnd();
+
+      QString tag = match.captured();
+
+      QRegularExpressionMatch match_links = links.match( tag );
+      if( !match_links.hasMatch() )
+      {
+        articleNewString += tag;
+        continue;
+      }
+
+      QString url = match_links.captured( 3 );
+
+      if( url.indexOf( ":/" ) >= 0 || url.indexOf( "data:" ) >= 0
+          || url.indexOf( "mailto:" ) >= 0 || url.startsWith( "#" )
+          || url.startsWith( "javascript:" ) )
+      {
+        // External link, anchor or base64-encoded data
+        articleNewString += tag;
+        continue;
+      }
+
+      QString newUrl = match_links.captured( 1 ) + "=" + match_links.captured( 2 );
+      if( url.startsWith( "//" ) )
+        newUrl += netReply->url().scheme() + ":";
+      else
+      if( url.startsWith( "/" ) )
+        newUrl += root;
+      else
+        newUrl += base;
+      newUrl += match_links.captured( 3 );
+
+      tag.replace( match_links.capturedStart(), match_links.capturedLength(), newUrl );
+      articleNewString += tag;
+    }
+    if( pos )
+    {
+      articleNewString += articleString.midRef( pos );
+      articleString = articleNewString;
+      articleNewString.clear();
+    }
+
+    // Redirect CSS links to own handler
+
+    QString prefix = QString( "bres://" ) + dictPtr->getId().c_str() + "/";
+    QRegularExpression linkTags( "(<\\s*link\\s[^>]*rel\\s*=\\s*['\"]stylesheet['\"]\\s+[^>]*href\\s*=\\s*['\"])([^'\"]+)://([^'\"]+['\"][^>]+>)",
+                                 QRegularExpression::CaseInsensitiveOption );
+    pos = 0;
+    it = linkTags.globalMatch( articleString );
+    while( it.hasNext() )
+    {
+      QRegularExpressionMatch match = it.next();
+      articleNewString += articleString.midRef( pos, match.capturedStart() - pos );
+      pos = match.capturedEnd();
+
+      QString newTag = match.captured( 1 ) + prefix + match.captured( 2 )
+                       + "/" + match.captured( 3 );
+      articleNewString += newTag;
+    }
+    if( pos )
+    {
+      articleNewString += articleString.midRef( pos );
+      articleString = articleNewString;
+      articleNewString.clear();
+    }
+#else
     QRegExp tags( "<\\s*(a|link|img|script)\\s+[^>]*(src|href)\\s*=\\s*['\"][^>]+>",
                   Qt::CaseInsensitive, QRegExp::RegExp2 );
     QRegExp links( "\\b(src|href)\\s*=\\s*(['\"])([^'\"]+['\"])",
@@ -285,7 +370,7 @@ void WebSiteArticleRequest::requestFinished( QNetworkReply * r )
       articleString.replace( pos, linkTags.cap().size(), newTag );
       pos += newTag.size();
     }
-
+#endif
     // Check for unclosed <span> and <div>
 
     int openTags = articleString.count( QRegExp( "<\\s*span\\b", Qt::CaseInsensitive ) );
@@ -333,8 +418,19 @@ void WebSiteArticleRequest::requestFinished( QNetworkReply * r )
 
   }
   else
-    setErrorString( netReply->errorString() );
+  {
+    if( netReply->url().scheme() == "file" )
+    {
+      gdWarning( "WebSites: Failed loading article from \"%s\", reason: %s\n", dictPtr->getName().c_str(),
+                 netReply->errorString().toUtf8().data() );
+    }
+    else
+    {
+      setErrorString( netReply->errorString() );
+    }
+  }
 
+  disconnect( netReply, 0, 0, 0 );
   netReply->deleteLater();
 
   finish();
@@ -343,7 +439,7 @@ void WebSiteArticleRequest::requestFinished( QNetworkReply * r )
 sptr< DataRequest > WebSiteDictionary::getArticle( wstring const & str,
                                                    vector< wstring > const &,
                                                    wstring const & context )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   QByteArray urlString;
 
@@ -484,6 +580,7 @@ void WebSiteResourceRequest::requestFinished( QNetworkReply * r )
     QUrl redirectUrl = possibleRedirectUrl.toUrl();
     if( !redirectUrl.isEmpty() )
     {
+      disconnect( netReply, 0, 0, 0 );
       netReply->deleteLater();
       netReply = mgr.get( QNetworkRequest( redirectUrl ) );
 #ifndef QT_NO_OPENSSL
@@ -515,12 +612,13 @@ void WebSiteResourceRequest::requestFinished( QNetworkReply * r )
   else
     setErrorString( netReply->errorString() );
 
+  disconnect( netReply, 0, 0, 0 );
   netReply->deleteLater();
 
   finish();
 }
 
-sptr< Dictionary::DataRequest > WebSiteDictionary::getResource( string const & name ) throw( std::exception )
+sptr< Dictionary::DataRequest > WebSiteDictionary::getResource( string const & name ) THROW_SPEC( std::exception )
 {
   QString link = QString::fromUtf8( name.c_str() );
   int pos = link.indexOf( '/' );
@@ -549,7 +647,7 @@ void WebSiteDictionary::loadIcon() throw()
 
 vector< sptr< Dictionary::Class > > makeDictionaries( Config::WebSites const & ws,
                                                       QNetworkAccessManager & mgr )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > result;
 

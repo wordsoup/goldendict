@@ -78,6 +78,68 @@ QKeySequence HotKey::toKeySequence() const
   return QKeySequence( key1 | modifiers, v2 );
 }
 
+bool InternalPlayerBackend::anyAvailable()
+{
+#if defined( MAKE_FFMPEG_PLAYER ) || defined( MAKE_QTMULTIMEDIA_PLAYER )
+  return true;
+#else
+  return false;
+#endif
+}
+
+InternalPlayerBackend InternalPlayerBackend::defaultBackend()
+{
+#if defined( MAKE_FFMPEG_PLAYER )
+  return ffmpeg();
+#elif defined( MAKE_QTMULTIMEDIA_PLAYER )
+  return qtmultimedia();
+#else
+  return InternalPlayerBackend( QString() );
+#endif
+}
+
+QStringList InternalPlayerBackend::nameList()
+{
+  QStringList result;
+#ifdef MAKE_FFMPEG_PLAYER
+  result.push_back( ffmpeg().uiName() );
+#endif
+#ifdef MAKE_QTMULTIMEDIA_PLAYER
+  result.push_back( qtmultimedia().uiName() );
+#endif
+  return result;
+}
+
+bool InternalPlayerBackend::isFfmpeg() const
+{
+#ifdef MAKE_FFMPEG_PLAYER
+  return *this == ffmpeg();
+#else
+  return false;
+#endif
+}
+
+bool InternalPlayerBackend::isQtmultimedia() const
+{
+#ifdef MAKE_QTMULTIMEDIA_PLAYER
+  return *this == qtmultimedia();
+#else
+  return false;
+#endif
+}
+
+ScanPopupWindowFlags spwfFromInt( int id )
+{
+  if( id == SPWF_Popup )
+    return SPWF_Popup;
+  if( id == SPWF_Tool )
+    return SPWF_Tool;
+
+  if( id != SPWF_default )
+    gdWarning( "Invalid ScanPopup unpinned window flags: %d\n", id );
+  return SPWF_default;
+}
+
 Preferences::Preferences():
   newTabsOpenAfterCurrentOne( false ),
   newTabsOpenInBackground( true ),
@@ -105,19 +167,20 @@ Preferences::Preferences():
   scanPopupModifiers( 0 ),
   scanPopupAltMode( false ),
   scanPopupAltModeSecs( 3 ),
+  ignoreOwnClipboardChanges( false ),
   scanPopupUseUIAutomation( true ),
   scanPopupUseIAccessibleEx( true ),
   scanPopupUseGDMessage( true ),
+  scanPopupUnpinnedWindowFlags( SPWF_default ),
+  scanPopupUnpinnedBypassWMHint( false ),
   scanToMainWindow( false ),
+#ifdef HAVE_X11
+  showScanFlag( false ),
+#endif
   pronounceOnLoadMain( false ),
   pronounceOnLoadPopup( false ),
-#ifndef DISABLE_INTERNAL_PLAYER
-  useExternalPlayer( false ),
-  useInternalPlayer( true ),
-#else
-  useExternalPlayer( true ),
-  useInternalPlayer( false ),
-#endif
+  useInternalPlayer( InternalPlayerBackend::anyAvailable() ),
+  internalPlayerBackend( InternalPlayerBackend::defaultBackend() ),
   checkForNewReleases( true ),
   disallowContentFromOtherSites( false ),
   enableWebPlugins( false ),
@@ -129,12 +192,15 @@ Preferences::Preferences():
   storeHistory( 1 ),
   alwaysExpandOptionalParts( false )
 , historyStoreInterval( 0 )
+, favoritesStoreInterval( 0 )
+, confirmFavoritesDeletion( true )
 , collapseBigArticles( false )
 , articleSizeLimit( 2000 )
 , maxDictionaryRefsInContextMenu ( 20 )
 #ifndef Q_WS_X11
 , trackClipboardChanges( false )
 #endif
+, synonymSearchEnabled( true )
 {
 }
 
@@ -203,7 +269,7 @@ WebSites makeDefaultWebSites()
 {
   WebSites ws;
 
-  ws.push_back( WebSite( "b88cb2898e634c6638df618528284c2d", "Google En-En (Oxford)", "https://www.google.com/dictionary?aq=f&langpair=en|en&q=%GDWORD%&hl=en", false, "", true ) );
+  ws.push_back( WebSite( "b88cb2898e634c6638df618528284c2d", "Google En-En (Oxford)", "https://www.google.com/search?q=define:%GDWORD%&hl=en", false, "", true ) );
   ws.push_back( WebSite( "f376365a0de651fd7505e7e5e683aa45", "Urban Dictionary", "https://www.urbandictionary.com/define.php?term=%GDWORD%", false, "", true ) );
   ws.push_back( WebSite( "324ca0306187df7511b26d3847f4b07c", "Multitran (En)", "https://multitran.ru/c/m.exe?CL=1&l1=1&s=%GD1251%", false, "", true ) );
   ws.push_back( WebSite( "924db471b105299c82892067c0f10787", "Lingvo (En-Ru)", "http://lingvopro.abbyyonline.com/en/Search/en-ru/%GDWORD%", false, "", true ) );
@@ -257,6 +323,7 @@ Group loadGroup( QDomElement grp, unsigned * nextId = 0 )
 
   g.name = grp.attribute( "name" );
   g.icon = grp.attribute( "icon" );
+  g.favoritesFolder = grp.attribute( "favoritesFolder" );
 
   if ( !grp.attribute( "iconData" ).isEmpty() )
     g.iconData = QByteArray::fromBase64( grp.attribute( "iconData" ).toLatin1() );
@@ -314,7 +381,7 @@ void saveMutedDictionaries( QDomDocument & dd, QDomElement & muted,
 
 }
 
-Class load() throw( exError )
+Class load() THROW_SPEC( exError )
 {
   QString configName  = getConfigFileName();
 
@@ -753,24 +820,30 @@ Class load() throw( exError )
     c.preferences.scanPopupAltMode = ( preferences.namedItem( "scanPopupAltMode" ).toElement().text() == "1" );
     if ( !preferences.namedItem( "scanPopupAltModeSecs" ).isNull() )
       c.preferences.scanPopupAltModeSecs = preferences.namedItem( "scanPopupAltModeSecs" ).toElement().text().toUInt();
+    c.preferences.ignoreOwnClipboardChanges = ( preferences.namedItem( "ignoreOwnClipboardChanges" ).toElement().text() == "1" );
     c.preferences.scanToMainWindow = ( preferences.namedItem( "scanToMainWindow" ).toElement().text() == "1" );
+#ifdef HAVE_X11
+    c.preferences.showScanFlag= ( preferences.namedItem( "showScanFlag" ).toElement().text() == "1" );
+#endif
     c.preferences.scanPopupUseUIAutomation = ( preferences.namedItem( "scanPopupUseUIAutomation" ).toElement().text() == "1" );
     c.preferences.scanPopupUseIAccessibleEx = ( preferences.namedItem( "scanPopupUseIAccessibleEx" ).toElement().text() == "1" );
     c.preferences.scanPopupUseGDMessage = ( preferences.namedItem( "scanPopupUseGDMessage" ).toElement().text() == "1" );
+    c.preferences.scanPopupUnpinnedWindowFlags = spwfFromInt( preferences.namedItem( "scanPopupUnpinnedWindowFlags" ).toElement().text().toInt() );
+    c.preferences.scanPopupUnpinnedBypassWMHint = ( preferences.namedItem( "scanPopupUnpinnedBypassWMHint" ).toElement().text() == "1" );
 
     c.preferences.pronounceOnLoadMain = ( preferences.namedItem( "pronounceOnLoadMain" ).toElement().text() == "1" );
     c.preferences.pronounceOnLoadPopup = ( preferences.namedItem( "pronounceOnLoadPopup" ).toElement().text() == "1" );
 
-    if ( !preferences.namedItem( "useExternalPlayer" ).isNull() )
-      c.preferences.useExternalPlayer = ( preferences.namedItem( "useExternalPlayer" ).toElement().text() == "1" );
+    if ( InternalPlayerBackend::anyAvailable() )
+    {
+      if ( !preferences.namedItem( "useInternalPlayer" ).isNull() )
+        c.preferences.useInternalPlayer = ( preferences.namedItem( "useInternalPlayer" ).toElement().text() == "1" );
+    }
+    else
+      c.preferences.useInternalPlayer = false;
 
-#ifndef DISABLE_INTERNAL_PLAYER
-    if ( !preferences.namedItem( "useInternalPlayer" ).isNull() )
-      c.preferences.useInternalPlayer = ( preferences.namedItem( "useInternalPlayer" ).toElement().text() == "1" );
-#else
-    c.preferences.useInternalPlayer = false;
-    c.preferences.useExternalPlayer = true;
-#endif
+    if ( !preferences.namedItem( "internalPlayerBackend" ).isNull() )
+      c.preferences.internalPlayerBackend.setUiName( preferences.namedItem( "internalPlayerBackend" ).toElement().text() );
 
     if ( !preferences.namedItem( "audioPlaybackProgram" ).isNull() )
       c.preferences.audioPlaybackProgram = preferences.namedItem( "audioPlaybackProgram" ).toElement().text();
@@ -819,6 +892,12 @@ Class load() throw( exError )
     if ( !preferences.namedItem( "historyStoreInterval" ).isNull() )
       c.preferences.historyStoreInterval = preferences.namedItem( "historyStoreInterval" ).toElement().text().toUInt() ;
 
+    if ( !preferences.namedItem( "favoritesStoreInterval" ).isNull() )
+      c.preferences.favoritesStoreInterval = preferences.namedItem( "favoritesStoreInterval" ).toElement().text().toUInt() ;
+
+    if ( !preferences.namedItem( "confirmFavoritesDeletion" ).isNull() )
+      c.preferences.confirmFavoritesDeletion = ( preferences.namedItem( "confirmFavoritesDeletion" ).toElement().text() == "1" );
+
     if ( !preferences.namedItem( "collapseBigArticles" ).isNull() )
       c.preferences.collapseBigArticles = ( preferences.namedItem( "collapseBigArticles" ).toElement().text() == "1" );
 
@@ -832,6 +911,9 @@ Class load() throw( exError )
     if ( !preferences.namedItem( "trackClipboardChanges" ).isNull() )
       c.preferences.trackClipboardChanges = ( preferences.namedItem( "trackClipboardChanges" ).toElement().text() == "1" );
 #endif
+
+    if ( !preferences.namedItem( "synonymSearchEnabled" ).isNull() )
+      c.preferences.synonymSearchEnabled = ( preferences.namedItem( "synonymSearchEnabled" ).toElement().text() == "1" );
 
     QDomNode fts = preferences.namedItem( "fullTextSearch" );
 
@@ -864,6 +946,12 @@ Class load() throw( exError )
       if ( !fts.namedItem( "enabled" ).isNull() )
         c.preferences.fts.enabled = ( fts.namedItem( "enabled" ).toElement().text() == "1" );
 
+      if ( !fts.namedItem( "ignoreWordsOrder" ).isNull() )
+        c.preferences.fts.ignoreWordsOrder = ( fts.namedItem( "ignoreWordsOrder" ).toElement().text() == "1" );
+
+      if ( !fts.namedItem( "ignoreDiacritics" ).isNull() )
+        c.preferences.fts.ignoreDiacritics = ( fts.namedItem( "ignoreDiacritics" ).toElement().text() == "1" );
+
       if ( !fts.namedItem( "maxDictionarySize" ).isNull() )
         c.preferences.fts.maxDictionarySize = fts.namedItem( "maxDictionarySize" ).toElement().text().toUInt();
     }
@@ -884,6 +972,8 @@ Class load() throw( exError )
     c.popupWindowGeometry = QByteArray::fromBase64( popupWindowGeometry.toElement().text().toLatin1() );
 
   c.pinPopupWindow = ( root.namedItem( "pinPopupWindow" ).toElement().text() == "1" );
+
+  c.popupWindowAlwaysOnTop = ( root.namedItem( "popupWindowAlwaysOnTop" ).toElement().text() == "1" );
 
   QDomNode mainWindowState = root.namedItem( "mainWindowState" );
 
@@ -985,6 +1075,9 @@ Class load() throw( exError )
     }
   }
 
+  if ( !root.namedItem( "maxHeadwordsToExpand" ).isNull() )
+    c.maxHeadwordsToExpand = root.namedItem( "maxHeadwordsToExpand" ).toElement().text().toUInt();
+
   QDomNode headwordsDialog = root.namedItem( "headwordsDialog" );
 
   if ( !headwordsDialog.isNull() )
@@ -1024,6 +1117,13 @@ void saveGroup( Group const & data, QDomElement & group )
   name.setValue( data.name );
 
   group.setAttributeNode( name );
+
+  if( data.favoritesFolder.size() )
+  {
+    QDomAttr folder = dd.createAttribute( "favoritesFolder" );
+    folder.setValue( data.favoritesFolder );
+    group.setAttributeNode( folder );
+  }
 
   if ( data.icon.size() )
   {
@@ -1095,7 +1195,7 @@ void saveGroup( Group const & data, QDomElement & group )
 
 }
 
-void save( Class const & c ) throw( exError )
+void save( Class const & c ) THROW_SPEC( exError )
 {
   QFile configFile( getConfigFileName() + ".tmp" );
 
@@ -1598,9 +1698,19 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( QString::number( c.preferences.scanPopupAltModeSecs ) ) );
     preferences.appendChild( opt );
 
+    opt = dd.createElement( "ignoreOwnClipboardChanges" );
+    opt.appendChild( dd.createTextNode( c.preferences.ignoreOwnClipboardChanges ? "1":"0" ) );
+    preferences.appendChild( opt );
+
     opt = dd.createElement( "scanToMainWindow" );
     opt.appendChild( dd.createTextNode( c.preferences.scanToMainWindow ? "1":"0" ) );
     preferences.appendChild( opt );
+
+#ifdef HAVE_X11
+    opt = dd.createElement( "showScanFlag" );
+    opt.appendChild( dd.createTextNode( c.preferences.showScanFlag? "1":"0" ) );
+    preferences.appendChild( opt );
+#endif
 
     opt = dd.createElement( "scanPopupUseUIAutomation" );
     opt.appendChild( dd.createTextNode( c.preferences.scanPopupUseUIAutomation ? "1":"0" ) );
@@ -1614,6 +1724,14 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( c.preferences.scanPopupUseGDMessage ? "1":"0" ) );
     preferences.appendChild( opt );
 
+    opt = dd.createElement( "scanPopupUnpinnedWindowFlags" );
+    opt.appendChild( dd.createTextNode( QString::number( c.preferences.scanPopupUnpinnedWindowFlags ) ) );
+    preferences.appendChild( opt );
+
+    opt = dd.createElement( "scanPopupUnpinnedBypassWMHint" );
+    opt.appendChild( dd.createTextNode( c.preferences.scanPopupUnpinnedBypassWMHint ? "1":"0" ) );
+    preferences.appendChild( opt );
+
     opt = dd.createElement( "pronounceOnLoadMain" );
     opt.appendChild( dd.createTextNode( c.preferences.pronounceOnLoadMain ? "1" : "0" ) );
     preferences.appendChild( opt );
@@ -1622,12 +1740,12 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( c.preferences.pronounceOnLoadPopup ? "1" : "0" ) );
     preferences.appendChild( opt );
 
-    opt = dd.createElement( "useExternalPlayer" );
-    opt.appendChild( dd.createTextNode( c.preferences.useExternalPlayer ? "1" : "0" ) );
-    preferences.appendChild( opt );
-
     opt = dd.createElement( "useInternalPlayer" );
     opt.appendChild( dd.createTextNode( c.preferences.useInternalPlayer ? "1" : "0" ) );
+    preferences.appendChild( opt );
+
+    opt = dd.createElement( "internalPlayerBackend" );
+    opt.appendChild( dd.createTextNode( c.preferences.internalPlayerBackend.uiName() ) );
     preferences.appendChild( opt );
 
     opt = dd.createElement( "audioPlaybackProgram" );
@@ -1644,6 +1762,14 @@ void save( Class const & c ) throw( exError )
 
     opt = dd.createElement( "historyStoreInterval" );
     opt.appendChild( dd.createTextNode( QString::number( c.preferences.historyStoreInterval ) ) );
+    preferences.appendChild( opt );
+
+    opt = dd.createElement( "favoritesStoreInterval" );
+    opt.appendChild( dd.createTextNode( QString::number( c.preferences.favoritesStoreInterval ) ) );
+    preferences.appendChild( opt );
+
+    opt = dd.createElement( "confirmFavoritesDeletion" );
+    opt.appendChild( dd.createTextNode( c.preferences.confirmFavoritesDeletion ? "1" : "0" ) );
     preferences.appendChild( opt );
 
     {
@@ -1736,6 +1862,11 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( c.preferences.trackClipboardChanges ? "1" : "0" ) );
     preferences.appendChild( opt );
 #endif
+
+    opt = dd.createElement( "synonymSearchEnabled" );
+    opt.appendChild( dd.createTextNode( c.preferences.synonymSearchEnabled ? "1" : "0" ) );
+    preferences.appendChild( opt );
+
     {
       QDomNode hd = dd.createElement( "fullTextSearch" );
       preferences.appendChild( hd );
@@ -1776,6 +1907,14 @@ void save( Class const & c ) throw( exError )
       opt.appendChild( dd.createTextNode( c.preferences.fts.enabled ? "1" : "0" ) );
       hd.appendChild( opt );
 
+      opt = dd.createElement( "ignoreWordsOrder" );
+      opt.appendChild( dd.createTextNode( c.preferences.fts.ignoreWordsOrder ? "1" : "0" ) );
+      hd.appendChild( opt );
+
+      opt = dd.createElement( "ignoreDiacritics" );
+      opt.appendChild( dd.createTextNode( c.preferences.fts.ignoreDiacritics ? "1" : "0" ) );
+      hd.appendChild( opt );
+
       opt = dd.createElement( "maxDictionarySize" );
       opt.appendChild( dd.createTextNode( QString::number( c.preferences.fts.maxDictionarySize ) ) );
       hd.appendChild( opt );
@@ -1802,6 +1941,10 @@ void save( Class const & c ) throw( exError )
 
     opt = dd.createElement( "pinPopupWindow" );
     opt.appendChild( dd.createTextNode( c.pinPopupWindow ? "1" : "0" ) );
+    root.appendChild( opt );
+
+    opt = dd.createElement( "popupWindowAlwaysOnTop" );
+    opt.appendChild( dd.createTextNode( c.popupWindowAlwaysOnTop ? "1" : "0" ) );
     root.appendChild( opt );
 
     opt = dd.createElement( "mainWindowState" );
@@ -1918,6 +2061,10 @@ void save( Class const & c ) throw( exError )
     opt = dd.createElement( "maxHeadwordSize" );
     opt.appendChild( dd.createTextNode( QString::number( c.maxHeadwordSize ) ) );
     root.appendChild( opt );
+
+    opt = dd.createElement( "maxHeadwordsToExpand" );
+    opt.appendChild( dd.createTextNode( QString::number( c.maxHeadwordsToExpand ) ) );
+    root.appendChild( opt );
   }
 
   {
@@ -1960,12 +2107,12 @@ QString getConfigFileName()
   return getHomeDir().absoluteFilePath( "config" );
 }
 
-QString getConfigDir() throw( exError )
+QString getConfigDir() THROW_SPEC( exError )
 {
   return getHomeDir().path() + QDir::separator();
 }
 
-QString getIndexDir() throw( exError )
+QString getIndexDir() THROW_SPEC( exError )
 {
   QDir result = getHomeDir();
 
@@ -1977,27 +2124,32 @@ QString getIndexDir() throw( exError )
   return result.path() + QDir::separator();
 }
 
-QString getPidFileName() throw( exError )
+QString getPidFileName() THROW_SPEC( exError )
 {
   return getHomeDir().filePath( "pid" );
 }
 
-QString getHistoryFileName() throw( exError )
+QString getHistoryFileName() THROW_SPEC( exError )
 {
   return getHomeDir().filePath( "history" );
 }
 
-QString getUserCssFileName() throw( exError )
+QString getFavoritiesFileName() THROW_SPEC( exError )
+{
+  return getHomeDir().filePath( "favorites" );
+}
+
+QString getUserCssFileName() THROW_SPEC( exError )
 {
   return getHomeDir().filePath( "article-style.css" );
 }
 
-QString getUserCssPrintFileName() throw( exError )
+QString getUserCssPrintFileName() THROW_SPEC( exError )
 {
   return getHomeDir().filePath( "article-style-print.css" );
 }
 
-QString getUserQtCssFileName() throw( exError )
+QString getUserQtCssFileName() THROW_SPEC( exError )
 {
   return getHomeDir().filePath( "qt-style.css" );
 }

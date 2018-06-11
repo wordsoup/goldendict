@@ -182,7 +182,7 @@
     </message>
     <message>
         <source>Failed to run a player to play sound file: %1</source>
-        <translation>Audio ist&apos;añataki panthatawa: %1</translation>
+        <translation type="obsolete">Audio ist&apos;añataki panthatawa: %1</translation>
     </message>
     <message>
         <source>Failed to create temporary file.</source>
@@ -305,10 +305,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>WARNING: FFmpeg Audio Player: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Copy as text</source>
         <translation type="unfinished"></translation>
     </message>
@@ -322,6 +318,14 @@
     </message>
     <message>
         <source>Video: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to play sound file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WARNING: Audio Player: %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -343,10 +347,6 @@ between classic and school orthography in cyrillic)</source>
 </context>
 <context>
     <name>ChineseConversion</name>
-    <message>
-        <source>GroupBox</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message>
         <source>Enable conversion between simplified and traditional Chinese characters</source>
         <translation type="unfinished"></translation>
@@ -389,6 +389,10 @@ between classic and school orthography in cyrillic)</source>
     </message>
     <message>
         <source>Traditional to simplified Chinese conversion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chinese Conversion</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -452,6 +456,10 @@ between classic and school orthography in cyrillic)</source>
     <message>
         <source>Can&apos;t read the specified image file.</source>
         <translation>Janiw uyu Jullinaka uyllañ munkiti  </translation>
+    </message>
+    <message>
+        <source>Favorites folder:</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -842,6 +850,36 @@ between classic and school orthography in cyrillic)</source>
     </message>
 </context>
 <context>
+    <name>FavoritesModel</name>
+    <message>
+        <source>Error in favorities file</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FavoritesPaneWidget</name>
+    <message>
+        <source>&amp;Delete Selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy Selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All selected items will be deleted. Continue?</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>Forvo::ForvoArticleRequest</name>
     <message>
         <source>XML parse error: %1 at %2,%3</source>
@@ -916,6 +954,14 @@ between classic and school orthography in cyrillic)</source>
     </message>
     <message>
         <source>Help</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore words order</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore diacritics</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3261,6 +3307,82 @@ To find &apos;*&apos;, &apos;?&apos;, &apos;[&apos;, &apos;]&apos; symbols use &
         <source>Now indexing for full-text search: </source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Favor&amp;ites Pane</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add current tab to Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export to list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export Favorites to file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>XML files (*.xml);;All files (*.*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites export complete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export Favorites to file as plain list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import Favorites from file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites import complete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Data parsing error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favo&amp;rites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ctrl+E</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add all tabs to Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove current tab from Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove headword &quot;%1&quot; from Favorites?</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>Mdx::MdxArticleRequest</name>
@@ -3303,6 +3425,13 @@ To find &apos;*&apos;, &apos;?&apos;, &apos;[&apos;, &apos;]&apos; symbols use &
     </message>
     <message>
         <source>Icon</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>MultimediaAudioPlayer</name>
+    <message>
+        <source>Couldn&apos;t open audio buffer for reading.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3425,7 +3554,7 @@ pestaña chiqan ist&apos;aratatawal.</translation>
         <translation>Machak pestañanak ist&apos;aran </translation>
     </message>
     <message>
-        <source>When enabled, an icon appears in the sytem tray area which can be used
+        <source>When enabled, an icon appears in the system tray area which can be used
 to open main window and perform other tasks.</source>
         <translation>Mä icono ist&apos;arasin, mä t&apos;uqu ist&apos;ari </translation>
     </message>
@@ -3942,14 +4071,6 @@ It is not needed to select this option if you don&apos;t use such programs.</sou
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Play audio files via FFmpeg(libav) and libao</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Use internal player</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Some sites detect GoldenDict via HTTP headers and block the requests.
 Enable this option to workaround the problem.</source>
         <translation type="unfinished"></translation>
@@ -4012,6 +4133,55 @@ Enable this option to workaround the problem.</source>
     </message>
     <message>
         <source>Help language</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Turn this option on to enable extra articles search via synonym lists
+from Stardict, Babylon and GLS dictionaries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Extra search via synonyms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites saving interval. If set to 0 Favorites will be saved only during exit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Turn this option on to confirm every operation of items deletion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Confirmation for items deletion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show a flag window before showing popup window, click the flag to show popup window. </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show scan flag when word is selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Play audio files via built-in audio support</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use internal player:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose audio back end</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter audio player command line</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -4154,6 +4324,38 @@ Enable this option to workaround the problem.</source>
         <source>avcodec_alloc_frame() failed.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Copyright: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Version: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Author: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>E-mail: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Title: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Website: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Date: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avcodec_alloc_context3() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>QuickFilterLine</name>
@@ -4184,6 +4386,10 @@ Enable this option to workaround the problem.</source>
         <source>The referenced resource failed to download.</source>
         <translation type="unfinished">Apakañanaka pantjiwa</translation>
     </message>
+    <message>
+        <source>WARNING: %1</source>
+        <translation type="unfinished">akataraki : %1</translation>
+    </message>
 </context>
 <context>
     <name>Romaji</name>
@@ -4201,6 +4407,13 @@ Enable this option to workaround the problem.</source>
     <message>
         <source>Russian Transliteration</source>
         <translation>Rusu arut qillqawi </translation>
+    </message>
+</context>
+<context>
+    <name>ScanFlag</name>
+    <message>
+        <source>MainWindow</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -4276,6 +4489,14 @@ could be resized or managed in other ways.</source>
     </message>
     <message>
         <source>%1 - %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add word to Favorites (Ctrl+E)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Always stay on top of all other windows</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

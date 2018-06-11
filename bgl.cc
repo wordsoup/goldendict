@@ -33,6 +33,10 @@
 
 #include <QRegExp>
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#endif
+
 #include "qt4x5.hh"
 
 namespace Bgl {
@@ -224,20 +228,22 @@ namespace
     { return idxHeader.langTo; }
 
     virtual sptr< Dictionary::WordSearchRequest > findHeadwordsForSynonym( wstring const & )
-      throw( std::exception );
+      THROW_SPEC( std::exception );
 
     virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                         vector< wstring > const & alts,
                                                         wstring const & )
-      throw( std::exception );
+      THROW_SPEC( std::exception );
 
     virtual sptr< Dictionary::DataRequest > getResource( string const & name )
-      throw( std::exception );
+      THROW_SPEC( std::exception );
 
     virtual sptr< Dictionary::DataRequest > getSearchResults( QString const & searchString,
                                                               int searchMode, bool matchCase,
                                                               int distanceBetweenWords,
-                                                              int maxResults );
+                                                              int maxResults,
+                                                              bool ignoreWordsOrder,
+                                                              bool ignoreDiacritics );
     virtual QString const& getDescription();
 
     virtual void getArticleText( uint32_t articleAddress, QString & headword, QString & text );
@@ -393,17 +399,23 @@ namespace
       char * dictDescription = chunks.getBlock( idxHeader.descriptionAddress, chunk );
       string str( dictDescription );
       if( !str.empty() )
-        dictionaryDescription += "Copyright: " + Html::unescape( QString::fromUtf8( str.data(), str.size() ) ) + "\n\n";
+        dictionaryDescription += QString( QObject::tr( "Copyright: %1%2" ) )
+                                 .arg( Html::unescape( QString::fromUtf8( str.data(), str.size() ) ) )
+                                 .arg( "\n\n" );
       dictDescription += str.size() + 1;
 
       str = string( dictDescription );
       if( !str.empty() )
-        dictionaryDescription += "Author: " + QString::fromUtf8( str.data(), str.size() ) + "\n\n";
+        dictionaryDescription += QString( QObject::tr( "Author: %1%2" ) )
+                                 .arg( QString::fromUtf8( str.data(), str.size() ) )
+                                 .arg( "\n\n" );
       dictDescription += str.size() + 1;
 
       str = string( dictDescription );
       if( !str.empty() )
-        dictionaryDescription += "E-mail: " + QString::fromUtf8( str.data(), str.size() ) + "\n\n";
+        dictionaryDescription += QString( QObject::tr( "E-mail: %1%2" ) )
+                                 .arg( QString::fromUtf8( str.data(), str.size() ) )
+                                 .arg( "\n\n" );
       dictDescription += str.size() + 1;
 
       str = string( dictDescription );
@@ -575,7 +587,7 @@ void BglHeadwordsRequest::run()
     {
       headwordDecoded = Utf8::decode( removePostfix(  headword ) );
     }
-    catch( Utf8::exCantDecode )
+    catch( Utf8::exCantDecode & )
     {
     }
 
@@ -594,9 +606,10 @@ void BglHeadwordsRequest::run()
 
 sptr< Dictionary::WordSearchRequest >
   BglDictionary::findHeadwordsForSynonym( wstring const & word )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
-  return new BglHeadwordsRequest( word, *this );
+  return synonymSearchEnabled ? new BglHeadwordsRequest( word, *this ) :
+                                Class::findHeadwordsForSynonym( word );
 }
 
 // Converts a $1$-like postfix to a <sup>1</sup> one
@@ -703,7 +716,7 @@ void BglArticleRequest::fixHebString(string & hebStr) // Hebrew support - conver
   {
     hebWStr = Utf8::decode(hebStr);
   }
-  catch( Utf8::exCantDecode )
+  catch( Utf8::exCantDecode & )
   {
     hebStr = "Utf-8 decoding error";
     return;
@@ -875,6 +888,28 @@ void BglArticleRequest::run()
   // Do some cleanups in the text
 
   BglDictionary::replaceCharsetEntities( result );
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+  result = QString::fromUtf8( result.c_str() )
+          // onclick location to link
+          .replace( QRegularExpression( "<([a-z0-9]+)\\s+[^>]*onclick=\"[a-z.]*location(?:\\.href)\\s*=\\s*'([^']+)[^>]*>([^<]+)</\\1>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "<a href=\"\\2\">\\3</a>")
+           .replace( QRegularExpression( "(<\\s*a\\s+[^>]*href\\s*=\\s*[\"']\\s*)bword://",
+                                         QRegularExpression::CaseInsensitiveOption ),
+                     "\\1bword:" )
+          //remove invalid width, height attrs
+          .replace( QRegularExpression( "(width|height)\\s*=\\s*[\"']\\d{7,}[\"'']" ),
+                   "" )
+          //remove invalid <br> tag
+          .replace( QRegularExpression( "<br>(<div|<table|<tbody|<tr|<td|</div>|</table>|</tbody>|</tr>|</td>|function addScript|var scNode|scNode|var atag|while\\(atag|atag=atag|document\\.getElementsByTagName|addScript|src=\"bres|<a onmouseover=\"return overlib|onclick=\"return overlib)",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    "\\1" )
+          .replace( QRegularExpression( "(AUTOSTATUS, WRAP\\);\" |</DIV>|addScript\\('JS_FILE_PHONG_VT_45634'\\);|appendChild\\(scNode\\);|atag\\.firstChild;)<br>",
+                                        QRegularExpression::CaseInsensitiveOption ),
+                    " \\1 " )
+           .toUtf8().data();
+#else
   result = QString::fromUtf8( result.c_str() )
           // onclick location to link
           .replace( QRegExp( "<([a-z0-9]+)\\s+[^>]*onclick=\"[a-z.]*location(?:\\.href)\\s*=\\s*'([^']+)[^>]*>([^<]+)</\\1>", Qt::CaseInsensitive ),
@@ -890,6 +925,7 @@ void BglArticleRequest::run()
           .replace( QRegExp( "(AUTOSTATUS, WRAP\\);\" |</DIV>|addScript\\('JS_FILE_PHONG_VT_45634'\\);|appendChild\\(scNode\\);|atag\\.firstChild;)<br>", Qt::CaseInsensitive ),
                     " \\1 " )
            .toUtf8().data();
+#endif
 
   Mutex::Lock _( dataMutex );
 
@@ -905,7 +941,7 @@ void BglArticleRequest::run()
 sptr< Dictionary::DataRequest > BglDictionary::getArticle( wstring const & word,
                                                            vector< wstring > const & alts,
                                                            wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new BglArticleRequest( word, alts, *this );
 }
@@ -1049,7 +1085,7 @@ void BglResourceRequest::run()
 }
 
 sptr< Dictionary::DataRequest > BglDictionary::getResource( string const & name )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new BglResourceRequest( idxMutex, idx, idxHeader.resourceListOffset,
                                  idxHeader.resourcesCount, name );
@@ -1058,6 +1094,38 @@ sptr< Dictionary::DataRequest > BglDictionary::getResource( string const & name 
   /// Replaces <CHARSET c="t">1234;</CHARSET> occurences with &#x1234;
   void BglDictionary::replaceCharsetEntities( string & text )
   {
+    QString str = QString::fromUtf8( text.c_str() );
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    QRegularExpression charsetExp( "<\\s*charset\\s+c\\s*=\\s*[\"']?t[\"']?\\s*>((?:\\s*[0-9a-fA-F]+\\s*;\\s*)*)<\\s*/\\s*charset\\s*>",
+                                   QRegularExpression::CaseInsensitiveOption
+                                   | QRegularExpression::InvertedGreedinessOption );
+
+    QRegularExpression oneValueExp( "\\s*([0-9a-fA-F]+)\\s*;" );
+    QString result;
+    int pos = 0;
+
+    QRegularExpressionMatchIterator it = charsetExp.globalMatch( str );
+    while( it.hasNext() )
+    {
+      QRegularExpressionMatch match = it.next();
+      result += str.midRef( pos, match.capturedStart() - pos );
+      pos = match.capturedEnd();
+
+      QRegularExpressionMatchIterator itValue = oneValueExp.globalMatch( match.captured( 1 ) );
+      while( itValue.hasNext() )
+      {
+        QRegularExpressionMatch matchValue = itValue.next();
+        result += "&#x" + matchValue.captured( 1 ) + ";";
+      }
+    }
+
+    if( pos )
+    {
+      result += str.midRef( pos );
+      str = result;
+    }
+#else
     QRegExp charsetExp( "<\\s*charset\\s+c\\s*=\\s*[\"']?t[\"']?\\s*>((?:\\s*[0-9a-fA-F]+\\s*;\\s*)*)<\\s*/\\s*charset\\s*>",
                         Qt::CaseInsensitive );
 
@@ -1065,8 +1133,6 @@ sptr< Dictionary::DataRequest > BglDictionary::getResource( string const & name 
     
     QRegExp oneValueExp( "\\s*([0-9a-fA-F]+)\\s*;" );
 
-    QString str = QString::fromUtf8( text.c_str() );
-    
     for( int pos = 0; ( pos = charsetExp.indexIn( str, pos ) ) != -1; )
     {
       //DPRINTF( "Match: %s\n", str.mid( pos, charsetExp.matchedLength() ).toUtf8().data() );
@@ -1083,6 +1149,7 @@ sptr< Dictionary::DataRequest > BglDictionary::getResource( string const & name 
 
       str.replace( pos, charsetExp.matchedLength(), out );
     }
+#endif
 
     text = str.toUtf8().data();
   }
@@ -1132,9 +1199,11 @@ sptr< Dictionary::DataRequest > BglDictionary::getResource( string const & name 
 sptr< Dictionary::DataRequest > BglDictionary::getSearchResults( QString const & searchString,
                                                                  int searchMode, bool matchCase,
                                                                  int distanceBetweenWords,
-                                                                 int maxResults )
+                                                                 int maxResults,
+                                                                 bool ignoreWordsOrder,
+                                                                 bool ignoreDiacritics )
 {
-  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults );
+  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults, ignoreWordsOrder, ignoreDiacritics );
 }
 
 
@@ -1142,7 +1211,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                                       vector< string > const & fileNames,
                                       string const & indicesDir,
                                       Dictionary::Initializing & initializing )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 

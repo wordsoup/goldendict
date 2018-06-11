@@ -7,8 +7,10 @@
 #include <QWebView>
 #include <QMap>
 #include <QUrl>
+#include <QSet>
 #include <list>
 #include "article_netmgr.hh"
+#include "audioplayerinterface.hh"
 #include "instances.hh"
 #include "groupcombobox.hh"
 #include "ui_articleview.h"
@@ -22,6 +24,7 @@ class ArticleView: public QFrame
   Q_OBJECT
 
   ArticleNetworkAccessManager & articleNetMgr;
+  AudioPlayerPtr const & audioPlayer;
   std::vector< sptr< Dictionary::Class > > const & allDictionaries;
   Instances::Groups const & groups;
   bool popupView;
@@ -46,7 +49,7 @@ class ArticleView: public QFrame
   QUrl resourceDownloadUrl;
 
   /// For resources opened via desktop services
-  QString desktopOpenedTempFile;
+  QSet< QString > desktopOpenedTempFiles;
 
   QAction * dictionaryBarToggled;
   GroupComboBox const * groupComboBox;
@@ -67,6 +70,7 @@ public:
   /// The groups aren't copied -- rather than that, the reference is kept
   ArticleView( QWidget * parent,
                ArticleNetworkAccessManager &,
+               AudioPlayerPtr const &,
                std::vector< sptr< Dictionary::Class > > const & allDictionaries,
                Instances::Groups const &,
                bool popupView,
@@ -97,7 +101,8 @@ public:
                        Contexts const & contexts = Contexts() );
 
   void showDefinition( QString const & word, QStringList const & dictIDs,
-                       QRegExp const & searchRegExp, unsigned group );
+                       QRegExp const & searchRegExp, unsigned group,
+                       bool ignoreDiacritics );
 
   /// Clears the view and sets the application-global waiting cursor,
   /// which will be restored when some article loads eventually.
@@ -131,11 +136,11 @@ public slots:
   /// Goes forward in history
   void forward();
 
-public:
-
   /// Takes the focus to the view
   void focus()
   { ui.definition->setFocus( Qt::ShortcutFocusReason ); }
+
+public:
 
   /// Reloads the view
   void reload()
@@ -176,8 +181,8 @@ public:
   /// Returns the dictionary id of the currently active article in the view.
   QString getActiveArticleId();
 
-  std::vector< ResourceToSaveHandler * > saveResource( const QUrl & url, const QString & fileName );
-  std::vector< ResourceToSaveHandler * > saveResource( const QUrl & url, const QUrl & ref, const QString & fileName );
+  ResourceToSaveHandler * saveResource( const QUrl & url, const QString & fileName );
+  ResourceToSaveHandler * saveResource( const QUrl & url, const QUrl & ref, const QString & fileName );
 
 signals:
 
@@ -281,7 +286,7 @@ private slots:
   void on_ftsSearchNext_clicked();
 
   /// Handles the double-click from the definition.
-  void doubleClicked();
+  void doubleClicked( QPoint pos );
 
   /// Handles audio player error message
   void audioPlayerError( QString const & message );
@@ -364,19 +369,22 @@ class ResourceToSaveHandler: public QObject
   Q_OBJECT
 
 public:
-  explicit ResourceToSaveHandler( ArticleView * view, sptr< Dictionary::DataRequest > req,
-                                  QString const & fileName );
+  explicit ResourceToSaveHandler( ArticleView * view, QString const & fileName );
+  void addRequest( sptr< Dictionary::DataRequest > req );
+  bool isEmpty()
+  { return downloadRequests.empty(); }
 
 signals:
   void done();
   void statusBarMessage( QString const & message, int timeout = 0, QPixmap const & pixmap = QPixmap() );
 
-private slots:
+public slots:
   void downloadFinished();
 
 private:
-  sptr< Dictionary::DataRequest > req;
+  std::list< sptr< Dictionary::DataRequest > > downloadRequests;
   QString fileName;
+  bool alreadyDone;
 };
 
 #endif

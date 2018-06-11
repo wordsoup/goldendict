@@ -16,11 +16,17 @@
 //////////////////////////////////////////////////////////////////////////
 
 QHotkeyApplication::QHotkeyApplication( int & argc, char ** argv ):
-  QtSingleApplication( argc, argv )
+  QIntermediateApplication( argc, argv )
 #ifdef Q_OS_WIN32
 ,  mainWindow( 0 )
 #endif
 {
+  connect( this, SIGNAL( commitDataRequest( QSessionManager& ) ),
+           this, SLOT( hotkeyAppCommitData( QSessionManager& ) ), Qt::DirectConnection );
+
+  connect( this, SIGNAL( saveStateRequest( QSessionManager& ) ),
+           this, SLOT( hotkeyAppSaveState( QSessionManager& ) ), Qt::DirectConnection );
+
 #if defined( Q_OS_WIN ) && IS_QT_5
   installNativeEventFilter( this );
 #endif
@@ -28,11 +34,17 @@ QHotkeyApplication::QHotkeyApplication( int & argc, char ** argv ):
 
 QHotkeyApplication::QHotkeyApplication( QString const & id,
                                         int & argc, char ** argv ):
-  QtSingleApplication( id, argc, argv )
+  QIntermediateApplication( id, argc, argv )
 #ifdef Q_OS_WIN32
 ,  mainWindow( 0 )
 #endif
 {
+  connect( this, SIGNAL( commitDataRequest( QSessionManager& ) ),
+           this, SLOT( hotkeyAppCommitData( QSessionManager& ) ), Qt::DirectConnection );
+
+  connect( this, SIGNAL( saveStateRequest( QSessionManager& ) ),
+           this, SLOT( hotkeyAppSaveState( QSessionManager& ) ), Qt::DirectConnection );
+
 #if defined( Q_OS_WIN ) && IS_QT_5
   installNativeEventFilter( this );
 #endif
@@ -48,10 +60,15 @@ void QHotkeyApplication::removeDataCommiter( DataCommitter & d )
   dataCommitters.removeAll( &d );
 }
 
-void QHotkeyApplication::commitData( QSessionManager & s )
+void QHotkeyApplication::hotkeyAppCommitData( QSessionManager & mgr )
 {
   for( int x = 0; x < dataCommitters.size(); ++x )
-    dataCommitters[ x ]->commitData( s );
+    dataCommitters[ x ]->commitData( mgr );
+}
+
+void QHotkeyApplication::hotkeyAppSaveState(QSessionManager & mgr )
+{
+  mgr.setRestartHint( QSessionManager::RestartNever );
 }
 
 void QHotkeyApplication::registerWrapper(HotkeyWrapper *wrapper)
@@ -717,7 +734,7 @@ HotkeyWrapper::GrabbedKeys::iterator HotkeyWrapper::grabKey( quint32 keyCode,
 
     if ( errorHandler.isError() )
     {
-      qDebug() << "Warning: Possible hotkeys conflict. Check your hotkeys options.";
+      gdWarning( "Possible hotkeys conflict. Check your hotkeys options." );
       ungrabKey( result.first );
     }
   }
@@ -734,7 +751,7 @@ void HotkeyWrapper::ungrabKey( GrabbedKeys::iterator i )
 
   if ( errorHandler.isError() )
   {
-    qDebug() << "Warning: Cannot ungrab the hotkey";
+    gdWarning( "Cannot ungrab the hotkey" );
   }
 }
 

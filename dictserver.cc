@@ -10,6 +10,10 @@
 #include "gddebug.hh"
 #include "htmlescape.hh"
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#endif
+
 namespace DictServer {
 
 using namespace Dictionary;
@@ -196,11 +200,11 @@ public:
   { return 0; }
 
   virtual sptr< WordSearchRequest > prefixMatch( wstring const &,
-                                                 unsigned long maxResults ) throw( std::exception );
+                                                 unsigned long maxResults ) THROW_SPEC( std::exception );
 
   virtual sptr< DataRequest > getArticle( wstring const &, vector< wstring > const & alts,
                                           wstring const & )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual quint32 getLangFrom() const
   { return langId; }
@@ -754,15 +758,96 @@ void DictServerArticleRequest::run()
             if( Qt4x5::AtomicInt::loadAcquire( isCancelled ) || !errorString.isEmpty() )
               break;
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+            static QRegularExpression phonetic( "\\\\([^\\\\]+)\\\\",
+                                                QRegularExpression::CaseInsensitiveOption ); // phonetics: \stuff\ ...
+            static QRegularExpression divs_inside_phonetic( "</div([^>]*)><div([^>]*)>",
+                                                            QRegularExpression::CaseInsensitiveOption );
+            static QRegularExpression refs( "\\{([^\\{\\}]+)\\}",
+                                            QRegularExpression::CaseInsensitiveOption );     // links: {stuff}
+            static QRegularExpression links( "<a href=\"gdlookup://localhost/([^\"]*)\">",
+                                             QRegularExpression::CaseInsensitiveOption );
+            static QRegularExpression tags( "<[^>]*>",
+                                            QRegularExpression::CaseInsensitiveOption );
+#else
             QRegExp phonetic( "\\\\([^\\\\]+)\\\\", Qt::CaseInsensitive ); // phonetics: \stuff\ ...
+            QRegExp divs_inside_phonetic( "</div([^>]*)><div([^>]*)>", Qt::CaseInsensitive );
             QRegExp refs( "\\{([^\\{\\}]+)\\}", Qt::CaseInsensitive );     // links: {stuff}
             QRegExp links( "<a href=\"gdlookup://localhost/([^\"]*)\">", Qt::CaseInsensitive );
             QRegExp tags( "<[^>]*>", Qt::CaseInsensitive );
-
+#endif
             string articleStr = Html::preformat( articleText.toUtf8().data() );
             articleText = QString::fromUtf8( articleStr.c_str(), articleStr.size() )
-                          .replace(phonetic, "<span class=\"dictd_phonetic\">\\1</span>" )
                           .replace(refs, "<a href=\"gdlookup://localhost/\\1\">\\1</a>" );
+
+            pos = 0;
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+            QString articleNewText;
+
+            // Handle phonetics
+
+            QRegularExpressionMatchIterator it = phonetic.globalMatch( articleText );
+            while( it.hasNext() )
+            {
+              QRegularExpressionMatch match = it.next();
+              articleNewText += articleText.midRef( pos, match.capturedStart() - pos );
+              pos = match.capturedEnd();
+
+              QString phonetic_text = match.captured( 1 );
+              phonetic_text.replace( divs_inside_phonetic, "</span></div\\1><div\\2><span class=\"dictd_phonetic\">" );
+
+              articleNewText += "<span class=\"dictd_phonetic\">" + phonetic_text + "</span>";
+            }
+            if( pos )
+            {
+              articleNewText += articleText.midRef( pos );
+              articleText = articleNewText;
+              articleNewText.clear();
+            }
+
+            // Handle links
+
+            pos = 0;
+            it = links.globalMatch( articleText );
+            while( it.hasNext() )
+            {
+              QRegularExpressionMatch match = it.next();
+              articleNewText += articleText.midRef( pos, match.capturedStart() - pos );
+              pos = match.capturedEnd();
+
+              QString link = match.captured( 1 );
+              link.replace( tags, " " );
+              link.replace( "&nbsp;", " " );
+
+              QString newLink = match.captured();
+              newLink.replace( 30, match.capturedLength( 1 ),
+                               QString::fromUtf8( QUrl::toPercentEncoding( link.simplified() ) ) );
+              articleNewText += newLink;
+            }
+            if( pos )
+            {
+              articleNewText += articleText.midRef( pos );
+              articleText = articleNewText;
+              articleNewText.clear();
+            }
+#else
+            // Handle phonetics
+
+            for( ; ; )
+            {
+              pos = articleText.indexOf( phonetic, pos );
+              if( pos < 0 )
+                break;
+
+              QString phonetic_text = phonetic.cap( 1 );
+              phonetic_text.replace( divs_inside_phonetic, "</span></div\\1><div\\2><span class=\"dictd_phonetic\">" );
+              phonetic_text = "<span class=\"dictd_phonetic\">" + phonetic_text + "</span>";
+              articleText.replace( pos, phonetic.cap().length(), phonetic_text );
+              pos += phonetic_text.length();
+            }
+
+            // Handle links
+
             pos = 0;
             for( ; ; )
             {
@@ -777,6 +862,7 @@ void DictServerArticleRequest::run()
                                    QString::fromUtf8( QUrl::toPercentEncoding( link.simplified() ) ) );
               pos += 30;
             }
+#endif
 
             articleData += string( "<div class=\"dictd_article\">" )
                            + articleText.toUtf8().data()
@@ -823,7 +909,7 @@ void DictServerArticleRequest::cancel()
 
 sptr< WordSearchRequest > DictServerDictionary::prefixMatch( wstring const & word,
                                                              unsigned long maxResults )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   (void) maxResults;
   if ( word.size() > 80 )
@@ -839,7 +925,7 @@ sptr< WordSearchRequest > DictServerDictionary::prefixMatch( wstring const & wor
 sptr< DataRequest > DictServerDictionary::getArticle( wstring const & word,
                                                       vector< wstring > const &,
                                                       wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   if ( word.size() > 80 )
   {
@@ -854,7 +940,7 @@ sptr< DataRequest > DictServerDictionary::getArticle( wstring const & word,
 } // Anonimuos namespace
 
 vector< sptr< Dictionary::Class > > makeDictionaries( Config::DictServers const & servers )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > result;
 

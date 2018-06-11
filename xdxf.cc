@@ -166,10 +166,10 @@ public:
   virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                       vector< wstring > const & alts,
                                                       wstring const & )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual sptr< Dictionary::DataRequest > getResource( string const & name )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual QString const& getDescription();
 
@@ -178,7 +178,9 @@ public:
   virtual sptr< Dictionary::DataRequest > getSearchResults( QString const & searchString,
                                                             int searchMode, bool matchCase,
                                                             int distanceBetweenWords,
-                                                            int maxResults );
+                                                            int maxResults,
+                                                            bool ignoreWordsOrder,
+                                                            bool ignoreDiacritics );
   virtual void getArticleText( uint32_t articleAddress, QString & headword, QString & text );
 
   virtual void makeFTSIndex(QAtomicInt & isCancelled, bool firstIteration );
@@ -421,9 +423,11 @@ void XdxfDictionary::getArticleText( uint32_t articleAddress, QString & headword
 sptr< Dictionary::DataRequest > XdxfDictionary::getSearchResults( QString const & searchString,
                                                                   int searchMode, bool matchCase,
                                                                   int distanceBetweenWords,
-                                                                  int maxResults )
+                                                                  int maxResults,
+                                                                  bool ignoreWordsOrder,
+                                                                  bool ignoreDiacritics )
 {
-  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults );
+  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults, ignoreWordsOrder, ignoreDiacritics );
 }
 
 /// XdxfDictionary::getArticle()
@@ -611,7 +615,7 @@ void XdxfArticleRequest::run()
 sptr< Dictionary::DataRequest > XdxfDictionary::getArticle( wstring const & word,
                                                             vector< wstring > const & alts,
                                                             wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new XdxfArticleRequest( word, alts, *this );
 }
@@ -675,11 +679,11 @@ class GzippedFile: public QIODevice
 
 public:
 
-  GzippedFile( char const * fileName ) throw( exCantReadFile );
+  GzippedFile( char const * fileName ) THROW_SPEC( exCantReadFile );
 
   ~GzippedFile();
 
-  size_t gzTell();
+//  size_t gzTell();
 
   char * readDataArray( unsigned long startPos, unsigned long size );
 
@@ -706,7 +710,7 @@ protected:
   { return -1; }
 };
 
-GzippedFile::GzippedFile( char const * fileName ) throw( exCantReadFile )
+GzippedFile::GzippedFile( char const * fileName ) THROW_SPEC( exCantReadFile )
 {
   gz = gd_gzopen( fileName );
   if ( !gz )
@@ -728,10 +732,12 @@ bool GzippedFile::atEnd() const
   return gzeof( gz );
 }
 
+/*
 size_t GzippedFile::gzTell()
 {
   return gztell( gz );
 }
+*/
 
 qint64 GzippedFile::readData( char * data, qint64 maxSize )
 {
@@ -908,7 +914,7 @@ void indexArticle( GzippedFile & gzFile,
       if ( words.empty() )
       {
         // Nothing to index, this article didn't have any tags
-        qWarning( "Warning: no <k> tags found in an article at offset 0x%x, article skipped.\n",
+        gdWarning( "No <k> tags found in an article at offset 0x%x, article skipped.\n",
                   (unsigned) articleOffset );
       }
       else
@@ -1127,7 +1133,7 @@ void XdxfResourceRequest::run()
 }
 
 sptr< Dictionary::DataRequest > XdxfDictionary::getResource( string const & name )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new XdxfResourceRequest( *this, name );
 }
@@ -1139,7 +1145,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                                       vector< string > const & fileNames,
                                       string const & indicesDir,
                                       Dictionary::Initializing & initializing )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 
@@ -1164,10 +1170,10 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
       string zipFileName;
 
-      if ( File::tryPossibleName( baseName + ".xdxf.files.zip", zipFileName ) ||
-           File::tryPossibleName( baseName + ".xdxf.dz.files.zip", zipFileName ) ||
-           File::tryPossibleName( baseName + ".XDXF.FILES.ZIP", zipFileName ) ||
-           File::tryPossibleName( baseName + ".XDXF.DZ.FILES.ZIP", zipFileName ) )
+      if ( File::tryPossibleZipName( baseName + ".xdxf.files.zip", zipFileName ) ||
+           File::tryPossibleZipName( baseName + ".xdxf.dz.files.zip", zipFileName ) ||
+           File::tryPossibleZipName( baseName + ".XDXF.FILES.ZIP", zipFileName ) ||
+           File::tryPossibleZipName( baseName + ".XDXF.DZ.FILES.ZIP", zipFileName ) )
         dictFiles.push_back( zipFileName );
 
       string dictId = Dictionary::makeDictionaryId( dictFiles );
@@ -1462,7 +1468,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
         if ( stream.hasError() )
         {
-          gdWarning( "Warning: %s had a parse error %s at line %lu, and therefore was indexed only up to the point of error.",
+          gdWarning( "%s had a parse error %s at line %lu, and therefore was indexed only up to the point of error.",
                       dictFiles[ 0 ].c_str(), stream.errorString().toUtf8().data(),
                       (unsigned long) stream.lineNumber() );
         }

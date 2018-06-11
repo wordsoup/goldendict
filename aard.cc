@@ -28,6 +28,10 @@
 #include <QDomDocument>
 #include <QtEndian>
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#endif
+
 #include "ufile.hh"
 #include "wstring_qt.hh"
 #include "qt4x5.hh"
@@ -260,14 +264,16 @@ class AardDictionary: public BtreeIndexing::BtreeDictionary
     virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                         vector< wstring > const & alts,
                                                         wstring const & )
-      throw( std::exception );
+      THROW_SPEC( std::exception );
 
     virtual QString const& getDescription();
 
     virtual sptr< Dictionary::DataRequest > getSearchResults( QString const & searchString,
                                                               int searchMode, bool matchCase,
                                                               int distanceBetweenWords,
-                                                              int maxResults );
+                                                              int maxResults,
+                                                              bool ignoreWordsOrder,
+                                                              bool ignoreDiacritics );
     virtual void getArticleText( uint32_t articleAddress, QString & headword, QString & text );
 
     virtual void makeFTSIndex(QAtomicInt & isCancelled, bool firstIteration );
@@ -388,17 +394,35 @@ string AardDictionary::convert( const string & in )
     }
 
     QString text = QString::fromUtf8( inConverted.c_str() );
-    text.replace( QRegExp( "<\\s*a\\s*href\\s*=\\s*\\\"(w:|s:){0,1}([^#](?!ttp://)[^\\\"]*)(.)" ),
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    text.replace( QRegularExpression( "<\\s*a\\s+href\\s*=\\s*\\\"(w:|s:){0,1}([^#](?!ttp://)[^\\\"]*)(.)",
+                                      QRegularExpression::DotMatchesEverythingOption ),
                   "<a href=\"bword:\\2\"");
-    text.replace( QRegExp( "<\\s*a\\s*href\\s*=\\s*'(w:|s:){0,1}([^#](?!ttp://)[^']*)(.)" ),
+    text.replace( QRegularExpression( "<\\s*a\\s+href\\s*=\\s*'(w:|s:){0,1}([^#](?!ttp://)[^']*)(.)",
+                                      QRegularExpression::DotMatchesEverythingOption ),
                   "<a href=\"bword:\\2\"");
 
     // Anchors
-    text.replace( QRegExp( "<a href=\"bword:([^#\"]+)#([^\"]+)" ),
+    text.replace( QRegularExpression( "<a\\s+href=\"bword:([^#\"]+)#([^\"]+)" ),
+                  "<a href=\"gdlookup://localhost/\\1?gdanchor=\\2" );
+
+    static QRegularExpression self_closing_divs( "(<div\\s+[^>]*)/>",
+                                                 QRegularExpression::CaseInsensitiveOption );  // <div ... />
+    text.replace( self_closing_divs, "\\1></div>" );
+#else
+    text.replace( QRegExp( "<\\s*a\\s+href\\s*=\\s*\\\"(w:|s:){0,1}([^#](?!ttp://)[^\\\"]*)(.)" ),
+                  "<a href=\"bword:\\2\"");
+    text.replace( QRegExp( "<\\s*a\\s+href\\s*=\\s*'(w:|s:){0,1}([^#](?!ttp://)[^']*)(.)" ),
+                  "<a href=\"bword:\\2\"");
+
+    // Anchors
+    text.replace( QRegExp( "<a\\s+href=\"bword:([^#\"]+)#([^\"]+)" ),
                   "<a href=\"gdlookup://localhost/\\1?gdanchor=\\2" );
 
     static QRegExp self_closing_divs( "(<div\\s[^>]*)/>", Qt::CaseInsensitive );  // <div ... />
     text.replace( self_closing_divs, "\\1></div>" );
+#endif
 
     // Fix outstanding elements
     text += "<br style=\"clear:both;\" />";
@@ -558,11 +582,11 @@ QString const& AardDictionary::getDescription()
     {
         map< string, string >::const_iterator iter = meta.find( "copyright" );
         if( iter != meta.end() )
-          dictionaryDescription = "Copyright: " + QString::fromUtf8( iter->second.c_str() ) + "\n\n";
+          dictionaryDescription = QString( QObject::tr( "Copyright: %1%2" ) ).arg( QString::fromUtf8( iter->second.c_str() ) ).arg( "\n\n" );
 
         iter = meta.find( "version" );
         if( iter != meta.end() )
-          dictionaryDescription = "Version: " + QString::fromUtf8( iter->second.c_str() ) + "\n\n";
+          dictionaryDescription = QString( QObject::tr( "Version: %1%2" ) ).arg( QString::fromUtf8( iter->second.c_str() ) ).arg( "\n\n" );
 
         iter = meta.find( "description" );
         if( iter != meta.end() )
@@ -630,9 +654,11 @@ void AardDictionary::getArticleText( uint32_t articleAddress, QString & headword
 sptr< Dictionary::DataRequest > AardDictionary::getSearchResults( QString const & searchString,
                                                                   int searchMode, bool matchCase,
                                                                   int distanceBetweenWords,
-                                                                  int maxResults )
+                                                                  int maxResults,
+                                                                  bool ignoreWordsOrder,
+                                                                  bool ignoreDiacritics )
 {
-  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults );
+  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults, ignoreWordsOrder, ignoreDiacritics );
 }
 
 /// AardDictionary::getArticle()
@@ -811,7 +837,7 @@ void AardArticleRequest::run()
 sptr< Dictionary::DataRequest > AardDictionary::getArticle( wstring const & word,
                                                             vector< wstring > const & alts,
                                                             wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   return new AardArticleRequest( word, alts, *this );
 }
@@ -821,8 +847,9 @@ sptr< Dictionary::DataRequest > AardDictionary::getArticle( wstring const & word
 vector< sptr< Dictionary::Class > > makeDictionaries(
                                       vector< string > const & fileNames,
                                       string const & indicesDir,
-                                      Dictionary::Initializing & initializing )
-  throw( std::exception )
+                                      Dictionary::Initializing & initializing,
+                                      unsigned maxHeadwordsToExpand )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 
@@ -993,7 +1020,11 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                 articleOffsets.insert( articleOffset );
 
             // Insert new entry
-            indexedWords.addWord( Utf8::decode( string( data.data(), wordSize ) ), articleOffset);
+            wstring word = Utf8::decode( string( data.data(), wordSize ) );
+            if( maxHeadwordsToExpand && dictHeader.wordsCount >= maxHeadwordsToExpand )
+              indexedWords.addSingleWord( word, articleOffset);
+            else
+              indexedWords.addWord( word, articleOffset);
 
             pos += has64bitIndex ? sizeof( IndexElement64 ) : sizeof( IndexElement );
           }

@@ -169,7 +169,7 @@
     </message>
     <message>
         <source>Failed to run a player to play sound file: %1</source>
-        <translation>Nepovedlo se spustit přehrávač zvukového souboru: %1</translation>
+        <translation type="obsolete">Nepovedlo se spustit přehrávač zvukového souboru: %1</translation>
     </message>
     <message>
         <source>Failed to create temporary file.</source>
@@ -305,7 +305,7 @@
     </message>
     <message>
         <source>WARNING: FFmpeg Audio Player: %1</source>
-        <translation>VAROVÁNÍ: FFmpeg Audio Player: %1</translation>
+        <translation type="obsolete">VAROVÁNÍ: FFmpeg Audio Player: %1</translation>
     </message>
     <message>
         <source>Copy as text</source>
@@ -322,6 +322,14 @@
     <message>
         <source>Video: %1</source>
         <translation>Video: %1</translation>
+    </message>
+    <message>
+        <source>Failed to play sound file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WARNING: Audio Player: %1</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -343,10 +351,6 @@ a školní ortografií v cyrilici)</translation>
 </context>
 <context>
     <name>ChineseConversion</name>
-    <message>
-        <source>GroupBox</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message>
         <source>Enable conversion between simplified and traditional Chinese characters</source>
         <translation type="unfinished"></translation>
@@ -389,6 +393,10 @@ a školní ortografií v cyrilici)</translation>
     </message>
     <message>
         <source>Traditional to simplified Chinese conversion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chinese Conversion</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -452,6 +460,10 @@ a školní ortografií v cyrilici)</translation>
     <message>
         <source>Can&apos;t read the specified image file.</source>
         <translation>Zvolený obrázek nelze přečíst.</translation>
+    </message>
+    <message>
+        <source>Favorites folder:</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -843,6 +855,36 @@ a školní ortografií v cyrilici)</translation>
     </message>
 </context>
 <context>
+    <name>FavoritesModel</name>
+    <message>
+        <source>Error in favorities file</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FavoritesPaneWidget</name>
+    <message>
+        <source>&amp;Delete Selected</source>
+        <translation type="unfinished">Smazat vy&amp;brané</translation>
+    </message>
+    <message>
+        <source>Copy Selected</source>
+        <translation type="unfinished">Kopírovat vybrané</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All selected items will be deleted. Continue?</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>Forvo::ForvoArticleRequest</name>
     <message>
         <source>XML parse error: %1 at %2,%3</source>
@@ -917,6 +959,14 @@ a školní ortografií v cyrilici)</translation>
     </message>
     <message>
         <source>Help</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore words order</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore diacritics</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3258,6 +3308,82 @@ To find &apos;*&apos;, &apos;?&apos;, &apos;[&apos;, &apos;]&apos; symbols use &
         <source>Now indexing for full-text search: </source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Favor&amp;ites Pane</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add current tab to Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export to list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export Favorites to file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>XML files (*.xml);;All files (*.*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites export complete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export Favorites to file as plain list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import Favorites from file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites import complete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Data parsing error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favo&amp;rites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ctrl+E</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add all tabs to Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove current tab from Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove headword &quot;%1&quot; from Favorites?</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>Mdx::MdxArticleRequest</name>
@@ -3301,6 +3427,13 @@ To find &apos;*&apos;, &apos;?&apos;, &apos;[&apos;, &apos;]&apos; symbols use &
     <message>
         <source>Icon</source>
         <translation>Ikona</translation>
+    </message>
+</context>
+<context>
+    <name>MultimediaAudioPlayer</name>
+    <message>
+        <source>Couldn&apos;t open audio buffer for reading.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -3423,7 +3556,7 @@ kartou. Jinak jsou otevřeny jako poslední.</translation>
         <translation>Otevírat nové karty za současnou</translation>
     </message>
     <message>
-        <source>When enabled, an icon appears in the sytem tray area which can be used
+        <source>When enabled, an icon appears in the system tray area which can be used
 to open main window and perform other tasks.</source>
         <translation>Pokud zapnuto, zobrazí se v systémovém panelu ikona, která pak může 
 být použita pro otevření hlavního okna a k provádění jiných úloh.</translation>
@@ -3978,11 +4111,11 @@ Pokud takové programy nepoužíváte, nemusíte tuto volbu zapínat.</translati
     </message>
     <message>
         <source>Play audio files via FFmpeg(libav) and libao</source>
-        <translation>Přehrávat audio soubory přes FFmpeg(libav) a libao</translation>
+        <translation type="obsolete">Přehrávat audio soubory přes FFmpeg(libav) a libao</translation>
     </message>
     <message>
         <source>Use internal player</source>
-        <translation>Použít vlastní přehrávač</translation>
+        <translation type="obsolete">Použít vlastní přehrávač</translation>
     </message>
     <message>
         <source>Some sites detect GoldenDict via HTTP headers and block the requests.
@@ -4048,6 +4181,55 @@ Povolením této volby problém obejdete.</translation>
     </message>
     <message>
         <source>Help language</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Turn this option on to enable extra articles search via synonym lists
+from Stardict, Babylon and GLS dictionaries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Extra search via synonyms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Favorites saving interval. If set to 0 Favorites will be saved only during exit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Turn this option on to confirm every operation of items deletion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Confirmation for items deletion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show a flag window before showing popup window, click the flag to show popup window. </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show scan flag when word is selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Play audio files via built-in audio support</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use internal player:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose audio back end</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter audio player command line</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -4190,6 +4372,38 @@ Povolením této volby problém obejdete.</translation>
         <source>avcodec_alloc_frame() failed.</source>
         <translation>Selhal avcodec_alloc_frame().</translation>
     </message>
+    <message>
+        <source>Copyright: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Version: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Author: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>E-mail: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Title: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Website: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Date: %1%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avcodec_alloc_context3() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>QuickFilterLine</name>
@@ -4220,6 +4434,10 @@ Povolením této volby problém obejdete.</translation>
         <source>The referenced resource failed to download.</source>
         <translation>Odkázaný zdroj se nepovedlo stáhnout.</translation>
     </message>
+    <message>
+        <source>WARNING: %1</source>
+        <translation type="unfinished">VAROVÁNÍ: %1</translation>
+    </message>
 </context>
 <context>
     <name>Romaji</name>
@@ -4237,6 +4455,13 @@ Povolením této volby problém obejdete.</translation>
     <message>
         <source>Russian Transliteration</source>
         <translation>Ruský přepis</translation>
+    </message>
+</context>
+<context>
+    <name>ScanFlag</name>
+    <message>
+        <source>MainWindow</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -4318,6 +4543,14 @@ Lze měnit jeho velikost a může s ním být i jinak manipulováno.</translatio
     <message>
         <source>%1 - %2</source>
         <translation>%1 - %2</translation>
+    </message>
+    <message>
+        <source>Add word to Favorites (Ctrl+E)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Always stay on top of all other windows</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

@@ -22,6 +22,10 @@
 
 #include <QDebug>
 
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+#include <QRegularExpression>
+#endif
+
 #ifdef _MSC_VER
 #include <stub_msvc.h>
 #endif
@@ -121,14 +125,16 @@ public:
   virtual sptr< Dictionary::DataRequest > getArticle( wstring const &,
                                                       vector< wstring > const & alts,
                                                       wstring const & )
-    throw( std::exception );
+    THROW_SPEC( std::exception );
 
   virtual QString const& getDescription();
 
   virtual sptr< Dictionary::DataRequest > getSearchResults( QString const & searchString,
                                                             int searchMode, bool matchCase,
                                                             int distanceBetweenWords,
-                                                            int maxResults );
+                                                            int maxResults,
+                                                            bool ignoreWordsOrder,
+                                                            bool ignoreDiacritics );
   void getArticleText( uint32_t articleAddress, QString & headword, QString & text );
 
   virtual void makeFTSIndex(QAtomicInt & isCancelled, bool firstIteration );
@@ -249,7 +255,7 @@ uint32_t decodeBase64( string const & str )
 sptr< Dictionary::DataRequest > DictdDictionary::getArticle( wstring const & word,
                                                              vector< wstring > const & alts,
                                                              wstring const & )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   try
   {
@@ -330,10 +336,21 @@ sptr< Dictionary::DataRequest > DictdDictionary::getArticle( wstring const & wor
       }
       else
       {
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+        static QRegularExpression phonetic( "\\\\([^\\\\]+)\\\\",
+                                            QRegularExpression::CaseInsensitiveOption ); // phonetics: \stuff\ ...
+        static QRegularExpression refs( "\\{([^\\{\\}]+)\\}",
+                                        QRegularExpression::CaseInsensitiveOption );     // links: {stuff}
+        static QRegularExpression links( "<a href=\"gdlookup://localhost/([^\"]*)\">",
+                                         QRegularExpression::CaseInsensitiveOption );
+        static QRegularExpression tags( "<[^>]*>",
+                                        QRegularExpression::CaseInsensitiveOption );
+#else
         static QRegExp phonetic( "\\\\([^\\\\]+)\\\\", Qt::CaseInsensitive ); // phonetics: \stuff\ ...
         static QRegExp refs( "\\{([^\\{\\}]+)\\}", Qt::CaseInsensitive );     // links: {stuff}
         static QRegExp links( "<a href=\"gdlookup://localhost/([^\"]*)\">", Qt::CaseInsensitive );
         static QRegExp tags( "<[^>]*>", Qt::CaseInsensitive );
+#endif
 
         articleText = string( "<div class=\"dictd_article\"" );
         if( isToLanguageRTL() )
@@ -349,6 +366,31 @@ sptr< Dictionary::DataRequest > DictdDictionary::getArticle( wstring const & wor
         convertedText.erase();
 
         int pos = 0;
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+        QString articleNewString;
+        QRegularExpressionMatchIterator it = links.globalMatch( articleString );
+        while( it.hasNext() )
+        {
+          QRegularExpressionMatch match = it.next();
+          articleNewString += articleString.midRef( pos, match.capturedStart() - pos );
+          pos = match.capturedEnd();
+
+          QString link = match.captured( 1 );
+          link.replace( tags, " " );
+          link.replace( "&nbsp;", " " );
+
+          QString newLink = match.captured();
+          newLink.replace( 30, match.capturedLength( 1 ),
+                           QString::fromUtf8( QUrl::toPercentEncoding( link.simplified() ) ) );
+          articleNewString += newLink;
+        }
+        if( pos )
+        {
+          articleNewString += articleString.midRef( pos );
+          articleString = articleNewString;
+          articleNewString.clear();
+        }
+#else
         for( ; ; )
         {
           pos = articleString.indexOf( links, pos );
@@ -362,12 +404,12 @@ sptr< Dictionary::DataRequest > DictdDictionary::getArticle( wstring const & wor
                                  QString::fromUtf8( QUrl::toPercentEncoding( link.simplified() ) ) );
           pos += 30;
         }
+#endif
 
         articleString += "</div>";
 
         articleText += articleString.toUtf8().data();
       }
-
 
       // Ok. Now, does it go to main articles, or to alternate ones? We list
       // main ones first, and alternates after.
@@ -517,8 +559,15 @@ void DictdDictionary::getArticleText( uint32_t articleAddress, QString & headwor
     }
     else
     {
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+      static QRegularExpression phonetic( "\\\\([^\\\\]+)\\\\",
+                                          QRegularExpression::CaseInsensitiveOption ); // phonetics: \stuff\ ...
+      static QRegularExpression refs( "\\{([^\\{\\}]+)\\}",
+                                      QRegularExpression::CaseInsensitiveOption );     // links: {stuff}
+#else
       static QRegExp phonetic( "\\\\([^\\\\]+)\\\\", Qt::CaseInsensitive ); // phonetics: \stuff\ ...
       static QRegExp refs( "\\{([^\\{\\}]+)\\}", Qt::CaseInsensitive );     // links: {stuff}
+#endif
 
       string convertedText = Html::preformat( articleBody, isToLanguageRTL() );
       free( articleBody );
@@ -539,9 +588,11 @@ void DictdDictionary::getArticleText( uint32_t articleAddress, QString & headwor
 sptr< Dictionary::DataRequest > DictdDictionary::getSearchResults( QString const & searchString,
                                                                    int searchMode, bool matchCase,
                                                                    int distanceBetweenWords,
-                                                                   int maxResults )
+                                                                   int maxResults,
+                                                                   bool ignoreWordsOrder,
+                                                                   bool ignoreDiacritics )
 {
-  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults );
+  return new FtsHelpers::FTSResultsRequest( *this, searchString,searchMode, matchCase, distanceBetweenWords, maxResults, ignoreWordsOrder, ignoreDiacritics );
 }
 
 } // anonymous namespace
@@ -550,7 +601,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                                       vector< string > const & fileNames,
                                       string const & indicesDir,
                                       Dictionary::Initializing & initializing )
-  throw( std::exception )
+  THROW_SPEC( std::exception )
 {
   vector< sptr< Dictionary::Class > > dictionaries;
 

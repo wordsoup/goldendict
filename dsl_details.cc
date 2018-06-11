@@ -40,6 +40,112 @@ int wcscasecmp( const wchar *s1, const wchar *s2 )
 
 #endif
 
+static DSLLangCode LangCodes[] =
+{
+  { 1, "en" },
+  { 1033, "en" },
+  { 2, "ru" },
+  { 1049, "ru" },
+  { 1068, "az" },
+  { 1025, "ar" },
+  { 1067, "am" },
+  { 15, "af" },
+  { 1078, "af" },
+  { 9, "eu" },
+  { 1069, "eu" },
+  { 1133, "ba" },
+  { 21, "be" },
+  { 1059, "be" },
+  { 22, "bg" },
+  { 1026, "bg" },
+  { 19, "hu" },
+  { 1038, "hu" },
+  { 10, "nl" },
+  { 1043, "nl" },
+  { 1032, "el" },
+  { 1079, "ka" },
+  { 13, "da" },
+  { 1030, "da" },
+  { 16, "id" },
+  { 1057, "id" },
+  { 1039, "is" },
+  { 6, "es" },
+  { 7, "es" },
+  { 3082, "es" },
+  { 1034, "es" },
+  { 5, "it" },
+  { 1040, "it" },
+  { 1087, "kk" },
+  { 1595, "ky" },
+  { 28, "ch" },
+  { 29, "ch" },
+  { 1028, "ch" },
+  { 2052, "ch" },
+  { 30, "la" },
+  { 1540, "la" },
+  { 1142, "la" },
+  { 1062, "lv" },
+  { 1063, "lt" },
+  { 1086, "ms" },
+  { 3, "de" },
+  { 26, "de" },
+  { 1031, "de" },
+  { 32775, "de" },
+  { 14, "nb" },
+  { 1044, "nb" },
+  { 25, "nn" },
+  { 2068, "nn" },
+  { 20, "pl" },
+  { 1045, "pl" },
+  { 8, "pt" },
+  { 2070, "pt" },
+  { 1048, "ro" },
+  { 23, "sr" },
+  { 3098, "sr" },
+  { 1051, "sk" },
+  { 1060, "sl" },
+  { 17, "sw" },
+  { 1089, "sw" },
+  { 1064, "tg" },
+  { 1092, "tt" },
+  { 27, "tr" },
+  { 1055, "tr" },
+  { 1090, "tk" },
+  { 1091, "tz" },
+  { 24, "uk" },
+  { 1058, "uk" },
+  { 11, "fi" },
+  { 1035, "fi" },
+  { 4, "fr" },
+  { 1036, "fr" },
+  { 18, "cs" },
+  { 1029, "cs" },
+  { 12, "sv" },
+  { 1053, "sv" },
+  { 1061, "et" },
+  { 0, "" },
+};
+
+string findCodeForDslId( int id )
+{
+  for( DSLLangCode const * lc = LangCodes; lc->code_id; ++lc )
+  {
+    if ( id == lc->code_id )
+    {
+      // We've got a match
+      return string( lc->code );
+    }
+  }
+  return string();
+}
+
+bool isAtSignFirst( wstring const & str )
+{
+  // Test if '@' is first in string except spaces and dsl tags
+  QRegExp reg( "[ \\t]*(?:\\[[^\\]]+\\][ \\t]*)*@", Qt::CaseInsensitive, QRegExp::RegExp2 );
+  return reg.indexIn( gd::toQString( str ) ) == 0;
+}
+
 /////////////// ArticleDom
 
 wstring ArticleDom::Node::renderAsText( bool stripTrsTag ) const
@@ -66,6 +172,7 @@ static inline bool checkM( wstring const & dest, wstring const & src )
 ArticleDom::ArticleDom( wstring const & str, string const & dictName,
                         wstring const & headword_):
   root( Node::Tag(), wstring(), wstring() ), stringPos( str.c_str() ),
+  lineStartPos( str.c_str() ),
   transcriptionCount( 0 ),
   dictionaryName( dictName ),
   headword( headword_ )
@@ -82,127 +189,149 @@ ArticleDom::ArticleDom( wstring const & str, string const & dictName,
 
       if ( ch == L'@' && !escaped )
       {
-        // Insided card
-        wstring linkTo;
-        nextChar();
-        for( ; ; nextChar() )
+        if( !atSignFirstInLine() )
         {
-          if( ch == L'\n' )
-            break;
-          if( ch != L'\r' )
-            linkTo.push_back( ch );
+          // Not insided card
+          if( dictName.empty() )
+            gdWarning( "Unescaped '@' symbol found" );
+          else
+            gdWarning( "Unescaped '@' symbol found in \"%s\"", dictName.c_str() );
         }
-        linkTo = Folding::trimWhitespace( linkTo );
-
-        if( !linkTo.empty() )
+        else
         {
-          list< wstring > allLinkEntries;
-          expandOptionalParts( linkTo, &allLinkEntries );
-
-          for( list< wstring >::iterator entry = allLinkEntries.begin();
-               entry != allLinkEntries.end(); )
+          // Insided card
+          wstring linkTo;
+          nextChar();
+          for( ; ; nextChar() )
           {
-            if ( !textNode )
+            if( ch == L'\n' )
+              break;
+            if( ch != L'\r' )
+              linkTo.push_back( ch );
+          }
+          linkTo = Folding::trimWhitespace( linkTo );
+
+          if( !linkTo.empty() )
+          {
+            list< wstring > allLinkEntries;
+            expandOptionalParts( linkTo, &allLinkEntries );
+
+            for( list< wstring >::iterator entry = allLinkEntries.begin();
+                 entry != allLinkEntries.end(); )
             {
-              Node text = Node( Node::Text(), wstring() );
+              if ( !textNode )
+              {
+                Node text = Node( Node::Text(), wstring() );
+
+                if ( stack.empty() )
+                {
+                  root.push_back( text );
+                  stack.push_back( &root.back() );
+                }
+                else
+                {
+                  stack.back()->push_back( text );
+                  stack.push_back( &stack.back()->back() );
+                }
+
+                textNode = stack.back();
+              }
+              textNode->text.push_back( L'-' );
+              textNode->text.push_back( L' ' );
+
+              // Close the currently opened text node
+              stack.pop_back();
+              textNode = 0;
+
+              wstring linkText = Folding::trimWhitespace( *entry );
+              processUnsortedParts( linkText, true );
+              ArticleDom nodeDom( linkText, dictName, headword_ );
+
+              Node link( Node::Tag(), GD_NATIVE_TO_WS( L"@" ), wstring() );
+              for( Node::iterator n = nodeDom.root.begin(); n != nodeDom.root.end(); ++n )
+                link.push_back( *n );
+
+              ++entry;
 
               if ( stack.empty() )
               {
-                root.push_back( text );
-                stack.push_back( &root.back() );
+                root.push_back( link );
+                if( entry != allLinkEntries.end() ) // Add line break before next entry
+                  root.push_back( Node( Node::Tag(), GD_NATIVE_TO_WS( L"br" ), wstring() ) );
               }
               else
               {
-                stack.back()->push_back( text );
-                stack.push_back( &stack.back()->back() );
+                stack.back()->push_back( link );
+                if( entry != allLinkEntries.end() )
+                  stack.back()->push_back( Node( Node::Tag(), GD_NATIVE_TO_WS( L"br" ), wstring() ) );
               }
-
-              textNode = stack.back();
             }
-            textNode->text.push_back( L'-' );
-            textNode->text.push_back( L' ' );
 
-            // Close the currently opened text node
-            stack.pop_back();
-            textNode = 0;
+            // Skip to next '@'
 
-            wstring linkText = Folding::trimWhitespace( *entry );
-            processUnsortedParts( linkText, true );
-            ArticleDom nodeDom( linkText, dictName, headword_ );
+            while( !( ch == L'@' && !escaped && atSignFirstInLine() ) )
+              nextChar();
 
-            Node link( Node::Tag(), GD_NATIVE_TO_WS( L"@" ), wstring() );
-            for( Node::iterator n = nodeDom.root.begin(); n != nodeDom.root.end(); ++n )
-              link.push_back( *n );
-
-            ++entry;
-
-            if ( stack.empty() )
-            {
-              root.push_back( link );
-              if( entry != allLinkEntries.end() ) // Add line break before next entry
-                root.push_back( Node( Node::Tag(), GD_NATIVE_TO_WS( L"br" ), wstring() ) );
-            }
-            else
-            {
-              stack.back()->push_back( link );
-              if( entry != allLinkEntries.end() )
-                stack.back()->push_back( Node( Node::Tag(), GD_NATIVE_TO_WS( L"br" ), wstring() ) );
-            }
+            stringPos--;
+            ch = L'\n';
+            escaped = false;
           }
-
-
-
-          // Skip to next '@'
-
-          while( !( ch == L'@' && !escaped ) )
-            nextChar();
-
-          stringPos--;
-          ch = L'\n';
-          escaped = false;
         }
-
       } // if ( ch == L'@' )
 
       if ( ch == L'[' && !escaped )
       {
         // Beginning of a tag.
-        do
-        {
-          nextChar();
-        } while( Folding::isWhitespace( ch ) );
-
         bool isClosing;
-
-        if ( ch == L'/' && !escaped )
-        {
-          // A closing tag.
-          isClosing = true;
-          nextChar();
-        }
-        else
-          isClosing = false;
-
-        // Read tag's name
         wstring name;
-
-        while( ( ch != L']' || escaped ) && !Folding::isWhitespace( ch ) )
-        {
-          name.push_back( ch );
-          nextChar();
-        }
-
-        while( Folding::isWhitespace( ch ) )
-          nextChar();
-
-        // Read attrs
-
         wstring attrs;
 
-        while( ch != L']' || escaped )
+        try
         {
-          attrs.push_back( ch );
-          nextChar();
+          do
+          {
+            nextChar();
+          } while( Folding::isWhitespace( ch ) );
+
+          if ( ch == L'/' && !escaped )
+          {
+            // A closing tag.
+            isClosing = true;
+            nextChar();
+          }
+          else
+            isClosing = false;
+
+          // Read tag's name
+
+          while( ( ch != L']' || escaped ) && !Folding::isWhitespace( ch ) )
+          {
+            name.push_back( ch );
+            nextChar();
+          }
+
+          while( Folding::isWhitespace( ch ) )
+            nextChar();
+
+          // Read attrs
+
+          while( ch != L']' || escaped )
+          {
+            attrs.push_back( ch );
+            nextChar();
+          }
+        }
+        catch( eot )
+        {
+          if( !dictionaryName.empty() )
+            gdWarning( "DSL: Unfinished tag \"%s\" with attributes \"%s\" found in \"%s\", article \"%s\".",
+                       gd::toQString( name ).toUtf8().data(), gd::toQString( attrs ).toUtf8().data(),
+                       dictionaryName.c_str(), gd::toQString( headword ).toUtf8().data() );
+          else
+            gdWarning( "DSL: Unfinished tag \"%s\" with attributes \"%s\" found",
+                       gd::toQString( name ).toUtf8().data(), gd::toQString( attrs ).toUtf8().data() );
+
+          throw eot();
         }
 
         // Add the tag, or close it
@@ -625,16 +754,16 @@ void ArticleDom::closeTag( wstring const & name,
   if ( warn )
   {
     if( !dictionaryName.empty() )
-      gdWarning( "Warning: no corresponding opening tag for closing tag \"%s\" found in \"%s\", article \"%s\".",
+      gdWarning( "No corresponding opening tag for closing tag \"%s\" found in \"%s\", article \"%s\".",
                  gd::toQString( name ).toUtf8().data(), dictionaryName.c_str(),
                  gd::toQString( headword ).toUtf8().data() );
     else
-      gdWarning( "Warning: no corresponding opening tag for closing tag \"%s\" found.",
+      gdWarning( "No corresponding opening tag for closing tag \"%s\" found.",
                  gd::toQString( name ).toUtf8().data() );
   }
 }
 
-void ArticleDom::nextChar() throw( eot )
+void ArticleDom::nextChar() THROW_SPEC( eot )
 {
   if ( !*stringPos )
     throw eot();
@@ -664,12 +793,23 @@ void ArticleDom::nextChar() throw( eot )
   }
   else
     escaped = false;
+
+  if( ch == '\n' || ch == '\r' )
+    lineStartPos = stringPos;
 }
 
+bool ArticleDom::atSignFirstInLine()
+{
+  // Check if '@' sign is first after '\n', leading spaces and dsl tags
+  if( stringPos <= lineStartPos )
+    return true;
+
+  return isAtSignFirst( wstring( lineStartPos ) );
+}
 
 /////////////// DslScanner
 
-DslScanner::DslScanner( string const & fileName ) throw( Ex, Iconv::Ex ):
+DslScanner::DslScanner( string const & fileName ) THROW_SPEC( Ex, Iconv::Ex ):
   encoding( Windows1252 ), iconv( encoding ), readBufferPtr( readBuffer ),
   readBufferLeft( 0 ), wcharBuffer( 64 ), linesRead( 0 )
 {
@@ -758,6 +898,7 @@ DslScanner::DslScanner( string const & fileName ) throw( Ex, Iconv::Ex ):
     bool isName = false;
     bool isLangFrom = false;
     bool isLangTo = false;
+    bool isSoundDict = false;
 
     if ( !str.compare( 0, 5, GD_NATIVE_TO_WS( L"#NAME" ), 5 ) )
       isName = true;
@@ -767,6 +908,9 @@ DslScanner::DslScanner( string const & fileName ) throw( Ex, Iconv::Ex ):
     else
     if ( !str.compare( 0, 18, GD_NATIVE_TO_WS( L"#CONTENTS_LANGUAGE" ), 18 ) )
       isLangTo = true;
+    else
+    if ( !str.compare( 0, 17, GD_NATIVE_TO_WS( L"#SOUND_DICTIONARY" ), 17 ) )
+      isSoundDict = true;
     else
     if ( str.compare( 0, 17, GD_NATIVE_TO_WS( L"#SOURCE_CODE_PAGE" ), 17 ) )
       continue;
@@ -791,6 +935,8 @@ DslScanner::DslScanner( string const & fileName ) throw( Ex, Iconv::Ex ):
       langFrom = arg;
     else if ( isLangTo )
       langTo = arg;
+    else if ( isSoundDict )
+      soundDictionary = arg;
     else
     {
       // The encoding
@@ -835,7 +981,7 @@ DslScanner::~DslScanner() throw()
   gzclose( f );
 }
 
-bool DslScanner::readNextLine( wstring & out, size_t & offset ) throw( Ex,
+bool DslScanner::readNextLine( wstring & out, size_t & offset ) THROW_SPEC( Ex,
                                                                        Iconv::Ex )
 {
   offset = (size_t)( gztell( f ) - readBufferLeft );
@@ -941,7 +1087,7 @@ bool DslScanner::readNextLine( wstring & out, size_t & offset ) throw( Ex,
 }
 
 bool DslScanner::readNextLineWithoutComments( wstring & out, size_t & offset )
-                 throw( Ex, Iconv::Ex )
+                 THROW_SPEC( Ex, Iconv::Ex )
 {
   wstring str;
   bool commentToNextLine = false;
@@ -971,12 +1117,12 @@ bool DslScanner::readNextLineWithoutComments( wstring & out, size_t & offset )
 
 /////////////// DslScanner
 
-DslIconv::DslIconv( DslEncoding e ) throw( Iconv::Ex ):
+DslIconv::DslIconv( DslEncoding e ) THROW_SPEC( Iconv::Ex ):
   Iconv( Iconv::GdWchar, getEncodingNameFor( e ) )
 {
 }
 
-void DslIconv::reinit( DslEncoding e ) throw( Iconv::Ex )
+void DslIconv::reinit( DslEncoding e ) THROW_SPEC( Iconv::Ex )
 {
   Iconv::reinit( Iconv::GdWchar, getEncodingNameFor( e ) );
 }
@@ -1206,6 +1352,7 @@ void stripComments( wstring & str, bool & nextLine )
 
 void expandTildes( wstring & str, wstring const & tildeReplacement )
 {
+  wstring tildeValue = Folding::trimWhitespace( tildeReplacement );
   for( size_t x = 0; x < str.size(); )
     if ( str[ x ] == L'\\' )
       x+=2;
@@ -1214,15 +1361,15 @@ void expandTildes( wstring & str, wstring const & tildeReplacement )
     {
       if( x > 0 && str[ x - 1 ] == '^' && ( x < 2 || str[ x - 2 ] != '\\' ) )
       {
-        str.replace( x - 1, 2, tildeReplacement );
+        str.replace( x - 1, 2, tildeValue );
         str[ x - 1 ] = QChar( str[ x - 1 ] ).isUpper() ? QChar::toLower( (uint)str[ x - 1 ] )
                                                        : QChar::toUpper( (uint)str[ x - 1 ] );
-        x = x - 1 + tildeReplacement.size();
+        x = x - 1 + tildeValue.size();
       }
       else
       {
-        str.replace( x, 1, tildeReplacement );
-        x += tildeReplacement.size();
+        str.replace( x, 1, tildeValue );
+        x += tildeValue.size();
       }
     }
     else
